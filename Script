@@ -1,435 +1,290 @@
--- MonkeyGUI v1.6.2
--- by Jonah & Jan
--- Speed Run Fixes + Settings Farben
-
+-- MonkeyGUI v1.7.1 | by Jonah & Jan | Clean rewrite
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
+local UIS = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
+local RS = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
-
-print("[MonkeyGUI] Starte v1.6.5...")
-
-local VERSION = "1.6.5"
-local DISCORD_LINK = "https://discord.gg/SPf8xtvz2Q"
-
--- Altes GUI entfernen (bei erneutem Execute)
+print("[MonkeyGUI] Starte v1.7.1...")
 pcall(function()
-	local old = playerGui:FindFirstChild("MonkeyGUI")
-	if old then old:Destroy() end
+	local o = playerGui:FindFirstChild("MonkeyGUI")
+	if o then o:Destroy() end
 end)
+
+local CFG = {
+	VERSION = "1.7.1",
+	DISCORD = "https://discord.gg/SPf8xtvz2Q",
+	PANEL_W = 260, PANEL_H = 340, MIN_W = 260, MIN_H = 300, MAX_W = 420, MAX_H = 560,
+	SIDEBAR_W = 88, TITLE_H = 34, BTN_H = 34, TAB_H = 28,
+	COL_PANEL = Color3.fromRGB(18, 18, 24), COL_SIDE = Color3.fromRGB(24, 24, 32),
+	COL_TITLE = Color3.fromRGB(28, 28, 38), COL_BTN = Color3.fromRGB(35, 35, 48),
+	COL_ACCENT = Color3.fromRGB(100, 80, 220), COL_ON = Color3.fromRGB(0, 140, 80),
+	COL_TEXT = Color3.fromRGB(235, 235, 245), COL_MUTED = Color3.fromRGB(180, 180, 200),
+	COL_STROKE = Color3.fromRGB(60, 60, 80),
+	TP = {
+		W1 = Vector3.new(-9464.7158203125, 398.6060791015625, -222.31790161132812),
+		W2 = Vector3.new(-3629.0283203125, 168.29867553710938, -9358.833984375),
+		W3 = Vector3.new(-8049.72412109375, 347.1879577636719, 2768.822021484375),
+		W4 = Vector3.new(-7736.94482421875, 73.58101654052734, 5768.3271484375),
+		W5 = Vector3.new(-1340.6964111328125, 33.811241149902344, 7590.1025390625),
+	},
+	HUB = {
+		W1 = Vector3.new(-438.6725158691406, 28.736703872680664, -221.16766357421875),
+		W2 = Vector3.new(-439.3213195800781, 28.80070686340332, -2532.548095703125),
+		W3 = Vector3.new(-439.3213195800781, 28.736703872680664, 2775.951904296875),
+		W4 = Vector3.new(-439.3211975097656, 28.736703872680664, 5775.9521484375),
+		W5 = Vector3.new(-439.3211975097656, 28.736703872680664, 7596.9521484375),
+	},
+	ENDS = {
+		{n="World1End", p=Vector3.new(-9399.837890625, 808.3340454101562, -217.40939331054688), s=Vector3.new(2,919,520)},
+		{n="World2End", p=Vector3.new(-3619.22705078125, 209.0904541015625, -9341.31640625), s=Vector3.new(411,120,2)},
+		{n="World3End", p=Vector3.new(-8063.50927734375, 332.2464294433594, 2770.147705078125), s=Vector3.new(4,110,235)},
+		{n="World4End", p=Vector3.new(-7708.83203125, 77.25337982177734, 5769.6376953125), s=Vector3.new(1,124,512)},
+		{n="World5End", p=Vector3.new(-1324.158203125, 111.29043579101562, 7608.85888671875), s=Vector3.new(4,181,260)},
+	},
+}
+
+local State = {speedOn=false, speedFarmOn=false, immortalOn=false, speedRunOn=false, timerRunning=false, timerStart=0, currentWorld=nil, speedKey=Enum.KeyCode.E, rebinding=false, savedWins=nil, minimized=false, confirmCb=nil}
 
 local data = player:FindFirstChild("Data") or player:WaitForChild("Data", 3)
 local levelValue = data and data:FindFirstChild("Level")
-local winsFolder = data and data:FindFirstChild("Wins")
-local winsMantissa = winsFolder and winsFolder:FindFirstChild("Mantissa")
-local speedFolder = data and data:FindFirstChild("Speed")
-local speedMantissa = speedFolder and speedFolder:FindFirstChild("Mantissa")
-
+local winsMantissa = data and data:FindFirstChild("Wins") and data.Wins:FindFirstChild("Mantissa")
 local leaderstats = player:FindFirstChild("leaderstats") or player:WaitForChild("leaderstats", 3)
-local leaderLevel = leaderstats and (leaderstats:FindFirstChild("⏫ Level") or leaderstats:FindFirstChild("Level"))
-local leaderWins = leaderstats and (leaderstats:FindFirstChild("🏆 Wins") or leaderstats:FindFirstChild("Wins"))
-local leaderSpeed = leaderstats and (leaderstats:FindFirstChild("Speed") or leaderstats:FindFirstChild("🏃 Speed"))
+local leaderLevel = leaderstats and (leaderstats:FindFirstChild("Level") or leaderstats:FindFirstChild("⏫ Level"))
 
--- Wird per "Save Wins for Reset" gesetzt
-local savedWinsValue = nil
+local sg = Instance.new("ScreenGui")
+sg.Name = "MonkeyGUI"
+sg.ResetOnSpawn = false
+sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+sg.IgnoreGuiInset = true
+sg.Parent = playerGui
 
-local TELEPORT_POSITION_WORLD5 = Vector3.new(-1340.6964111328125, 33.811241149902344, 7590.1025390625)
-local TELEPORT_POSITION_WORLD4 = Vector3.new(-7736.94482421875, 73.58101654052734, 5768.3271484375)
-local TELEPORT_POSITION_WORLD3 = Vector3.new(-8049.72412109375, 347.1879577636719, 2768.822021484375)
-local TELEPORT_POSITION_WORLD2 = Vector3.new(-3629.0283203125, 168.29867553710938, -9358.833984375)
-local TELEPORT_POSITION_WORLD1 = Vector3.new(-9464.7158203125, 398.6060791015625, -222.31790161132812)
+local function corner(p, r)
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, r or 8)
+	c.Parent = p
+	return c
+end
+local function stroke(p, col, t, tr)
+	local s = Instance.new("UIStroke")
+	s.Color = col or CFG.COL_STROKE
+	s.Thickness = t or 1
+	s.Transparency = tr or 0.35
+	s.Parent = p
+	return s
+end
 
-local FORWARD_TIME = 0.00001
-local STAND_TIME = 0.00001
+-- Intro
+local intro = Instance.new("Frame")
+intro.Size = UDim2.new(1,0,1,0)
+intro.BackgroundColor3 = Color3.fromRGB(8,8,14)
+intro.BackgroundTransparency = 0.15
+intro.BorderSizePixel = 0
+intro.ZIndex = 100
+intro.Parent = sg
 
-local speedKeyCode = Enum.KeyCode.E
-local isRebinding = false
+local iTitle = Instance.new("TextLabel")
+iTitle.Size = UDim2.new(1,0,0,40)
+iTitle.Position = UDim2.new(0,0,0.35,0)
+iTitle.BackgroundTransparency = 1
+iTitle.Text = "MonkeyGUI"
+iTitle.TextColor3 = Color3.new(1,1,1)
+iTitle.TextSize = 32
+iTitle.Font = Enum.Font.GothamBlack
+iTitle.ZIndex = 101
+iTitle.Parent = intro
 
-local PANEL_W = 260
-local PANEL_H = 340
-local MIN_W = 260
-local MIN_H = 300
-local MAX_W = 420
-local MAX_H = 560
-local SIDEBAR_W = 88
-local TITLE_H = 34
-local BTN_H = 34
-local TAB_H = 30
+local iSub = Instance.new("TextLabel")
+iSub.Size = UDim2.new(1,0,0,20)
+iSub.Position = UDim2.new(0,0,0.35,42)
+iSub.BackgroundTransparency = 1
+iSub.Text = "by Jonah & Jan  |  v"..CFG.VERSION
+iSub.TextColor3 = Color3.fromRGB(160,155,200)
+iSub.TextSize = 13
+iSub.Font = Enum.Font.Gotham
+iSub.ZIndex = 101
+iSub.Parent = intro
 
--- Original Look (erster MonkeyGUI Style)
-local COL_PANEL = Color3.fromRGB(18, 18, 24)
-local COL_SIDE = Color3.fromRGB(24, 24, 32)
-local COL_TITLE = Color3.fromRGB(28, 28, 38)
-local COL_BTN = Color3.fromRGB(35, 35, 48)
-local COL_BTN_HOVER = Color3.fromRGB(48, 48, 65)
-local COL_ACCENT = Color3.fromRGB(100, 80, 220)
-local COL_ON = Color3.fromRGB(0, 140, 80)
-local COL_TEXT = Color3.fromRGB(235, 235, 245)
-local COL_MUTED = Color3.fromRGB(180, 180, 200)
-local COL_STROKE = Color3.fromRGB(60, 60, 80)
+local iStatus = Instance.new("TextLabel")
+iStatus.Size = UDim2.new(1,0,0,18)
+iStatus.Position = UDim2.new(0,0,0.55,0)
+iStatus.BackgroundTransparency = 1
+iStatus.Text = "Loading..."
+iStatus.TextColor3 = Color3.fromRGB(180,180,200)
+iStatus.TextSize = 13
+iStatus.Font = Enum.Font.Gotham
+iStatus.ZIndex = 101
+iStatus.Parent = intro
 
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "MonkeyGUI"
-screenGui.ResetOnSpawn = false
-screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-screenGui.IgnoreGuiInset = true
-screenGui.Parent = playerGui
-
--- ====================== INTRO ======================
-local introFrame = Instance.new("Frame")
-introFrame.Size = UDim2.new(1, 0, 1, 0)
-introFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 14)
-introFrame.BackgroundTransparency = 0.15
-introFrame.BorderSizePixel = 0
-introFrame.ZIndex = 100
-introFrame.Parent = screenGui
-
-local blurOverlay = Instance.new("Frame")
-blurOverlay.Size = UDim2.new(1, 0, 1, 0)
-blurOverlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-blurOverlay.BackgroundTransparency = 0.4
-blurOverlay.BorderSizePixel = 0
-blurOverlay.ZIndex = 100
-blurOverlay.Parent = introFrame
-
-local introTitle = Instance.new("TextLabel")
-introTitle.Size = UDim2.new(1, 0, 0, 50)
-introTitle.Position = UDim2.new(0, 0, 0.30, 0)
-introTitle.BackgroundTransparency = 1
-introTitle.Text = "MonkeyGUI"
-introTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-introTitle.TextSize = 36
-introTitle.Font = Enum.Font.GothamBlack
-introTitle.TextTransparency = 1
-introTitle.ZIndex = 101
-introTitle.Parent = introFrame
-
-local creatorText = Instance.new("TextLabel")
-creatorText.Size = UDim2.new(1, 0, 0, 18)
-creatorText.Position = UDim2.new(0, 0, 0.30, 48)
-creatorText.BackgroundTransparency = 1
-creatorText.Text = "by Jonah & Jan"
-creatorText.TextColor3 = Color3.fromRGB(160, 155, 200)
-creatorText.TextSize = 13
-creatorText.Font = Enum.Font.Gotham
-creatorText.TextTransparency = 1
-creatorText.ZIndex = 101
-creatorText.Parent = introFrame
-
-local versionText = Instance.new("TextLabel")
-versionText.Size = UDim2.new(1, 0, 0, 16)
-versionText.Position = UDim2.new(0, 0, 0.30, 68)
-versionText.BackgroundTransparency = 1
-versionText.Text = "v" .. VERSION
-versionText.TextColor3 = Color3.fromRGB(120, 120, 150)
-versionText.TextSize = 12
-versionText.Font = Enum.Font.Gotham
-versionText.TextTransparency = 1
-versionText.ZIndex = 101
-versionText.Parent = introFrame
-
-local titleGlow = Instance.new("ImageLabel")
-titleGlow.BackgroundTransparency = 1
-titleGlow.Image = "rbxassetid://5028857084"
-titleGlow.ImageColor3 = Color3.fromRGB(130, 100, 255)
-titleGlow.ImageTransparency = 1
-titleGlow.ScaleType = Enum.ScaleType.Slice
-titleGlow.SliceCenter = Rect.new(24, 24, 24, 24)
-titleGlow.Size = UDim2.new(0, 300, 0, 100)
-titleGlow.Position = UDim2.new(0.5, -150, 0.30, -20)
-titleGlow.ZIndex = 100
-titleGlow.Parent = introFrame
-
-local statusText = Instance.new("TextLabel")
-statusText.Size = UDim2.new(1, 0, 0, 20)
-statusText.Position = UDim2.new(0, 0, 0.52, 0)
-statusText.BackgroundTransparency = 1
-statusText.Text = "Initializing..."
-statusText.TextColor3 = Color3.fromRGB(170, 170, 200)
-statusText.TextSize = 13
-statusText.Font = Enum.Font.Gotham
-statusText.TextTransparency = 1
-statusText.ZIndex = 101
-statusText.Parent = introFrame
-
-local barBackground = Instance.new("Frame")
-barBackground.Size = UDim2.new(0, 240, 0, 6)
-barBackground.Position = UDim2.new(0.5, -120, 0.58, 0)
-barBackground.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
-barBackground.BorderSizePixel = 0
-barBackground.ZIndex = 101
-barBackground.Parent = introFrame
-
-local barBgCorner = Instance.new("UICorner")
-barBgCorner.CornerRadius = UDim.new(1, 0)
-barBgCorner.Parent = barBackground
-
+local barBg = Instance.new("Frame")
+barBg.Size = UDim2.new(0,220,0,6)
+barBg.Position = UDim2.new(0.5,-110,0.55,28)
+barBg.BackgroundColor3 = Color3.fromRGB(35,35,50)
+barBg.BorderSizePixel = 0
+barBg.ZIndex = 101
+barBg.Parent = intro
+corner(barBg, 4)
 local barFill = Instance.new("Frame")
-barFill.Size = UDim2.new(0, 0, 1, 0)
-barFill.BackgroundColor3 = Color3.fromRGB(130, 100, 255)
+barFill.Size = UDim2.new(0,0,1,0)
+barFill.BackgroundColor3 = CFG.COL_ACCENT
 barFill.BorderSizePixel = 0
 barFill.ZIndex = 102
-barFill.Parent = barBackground
+barFill.Parent = barBg
+corner(barFill, 4)
 
-local barFillCorner = Instance.new("UICorner")
-barFillCorner.CornerRadius = UDim.new(1, 0)
-barFillCorner.Parent = barFill
-
-local percentText = Instance.new("TextLabel")
-percentText.Size = UDim2.new(0, 50, 0, 16)
-percentText.Position = UDim2.new(0.5, -25, 0.58, 12)
-percentText.BackgroundTransparency = 1
-percentText.Text = "0%"
-percentText.TextColor3 = Color3.fromRGB(190, 190, 220)
-percentText.TextSize = 11
-percentText.Font = Enum.Font.GothamBold
-percentText.TextTransparency = 1
-percentText.ZIndex = 101
-percentText.Parent = introFrame
-
--- ====================== HAUPT PANEL ======================
-local mainFrame = Instance.new("Frame")
-mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, PANEL_W, 0, PANEL_H)
-mainFrame.Position = UDim2.new(0.5, -PANEL_W/2, 0.5, -PANEL_H/2)
-mainFrame.BackgroundColor3 = COL_PANEL
-mainFrame.BackgroundTransparency = 0
-mainFrame.BorderSizePixel = 0
-mainFrame.Active = true
-mainFrame.ClipsDescendants = true
-mainFrame.Visible = false
-mainFrame.Parent = screenGui
-
-local mainCorner = Instance.new("UICorner")
-mainCorner.CornerRadius = UDim.new(0, 10)
-mainCorner.Parent = mainFrame
-
-local mainStroke = Instance.new("UIStroke")
-mainStroke.Color = Color3.fromRGB(70, 70, 90)
-mainStroke.Thickness = 1.5
-mainStroke.Transparency = 0.3
-mainStroke.Parent = mainFrame
-
-local glow = Instance.new("ImageLabel")
-glow.BackgroundTransparency = 1
-glow.Image = "rbxassetid://5028857084"
-glow.ImageColor3 = Color3.fromRGB(100, 80, 255)
-glow.ImageTransparency = 0.85
-glow.ScaleType = Enum.ScaleType.Slice
-glow.SliceCenter = Rect.new(24, 24, 24, 24)
-glow.Size = UDim2.new(1, 40, 1, 40)
-glow.Position = UDim2.new(0, -20, 0, -20)
-glow.ZIndex = 0
-glow.Parent = mainFrame
+-- Main
+local main = Instance.new("Frame")
+main.Name = "MainFrame"
+main.Size = UDim2.new(0, CFG.PANEL_W, 0, CFG.PANEL_H)
+main.Position = UDim2.new(0.5, -CFG.PANEL_W/2, 0.5, -CFG.PANEL_H/2)
+main.BackgroundColor3 = CFG.COL_PANEL
+main.BorderSizePixel = 0
+main.Active = true
+main.ClipsDescendants = true
+main.Visible = false
+main.Parent = sg
+corner(main, 10)
+stroke(main, Color3.fromRGB(70,70,90), 1.5, 0.3)
 
 local titleBar = Instance.new("Frame")
-titleBar.Size = UDim2.new(1, 0, 0, TITLE_H)
-titleBar.BackgroundColor3 = COL_TITLE
-titleBar.BackgroundTransparency = 0
+titleBar.Size = UDim2.new(1,0,0,CFG.TITLE_H)
+titleBar.BackgroundColor3 = CFG.COL_TITLE
 titleBar.BorderSizePixel = 0
-titleBar.Parent = mainFrame
-
-local titleCorner = Instance.new("UICorner")
-titleCorner.CornerRadius = UDim.new(0, 10)
-titleCorner.Parent = titleBar
-
+titleBar.Parent = main
+corner(titleBar, 10)
 local titleFix = Instance.new("Frame")
-titleFix.Size = UDim2.new(1, 0, 0, 12)
-titleFix.Position = UDim2.new(0, 0, 1, -12)
-titleFix.BackgroundColor3 = COL_TITLE
-titleFix.BackgroundTransparency = 0
+titleFix.Size = UDim2.new(1,0,0,12)
+titleFix.Position = UDim2.new(0,0,1,-12)
+titleFix.BackgroundColor3 = CFG.COL_TITLE
 titleFix.BorderSizePixel = 0
 titleFix.Parent = titleBar
 
 local discordBtn = Instance.new("TextButton")
-discordBtn.Name = "DiscordButton"
-discordBtn.Size = UDim2.new(0, 52, 0, 24)
-discordBtn.Position = UDim2.new(0, 6, 0, 5)
-discordBtn.BackgroundColor3 = COL_ACCENT
-discordBtn.BackgroundTransparency = 0
-discordBtn.BorderSizePixel = 0
+discordBtn.Size = UDim2.new(0,52,0,24)
+discordBtn.Position = UDim2.new(0,6,0,5)
+discordBtn.BackgroundColor3 = CFG.COL_ACCENT
 discordBtn.Text = "Discord"
-discordBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+discordBtn.TextColor3 = Color3.new(1,1,1)
 discordBtn.TextSize = 10
 discordBtn.Font = Enum.Font.GothamBold
 discordBtn.AutoButtonColor = false
 discordBtn.Parent = titleBar
-
-local discordCorner = Instance.new("UICorner")
-discordCorner.CornerRadius = UDim.new(0, 6)
-discordCorner.Parent = discordBtn
-
+corner(discordBtn, 6)
 discordBtn.MouseButton1Click:Connect(function()
-	if setclipboard then
-		setclipboard(DISCORD_LINK)
-		print("[MonkeyGUI] Discord Link kopiert:", DISCORD_LINK)
-	else
-		print("[MonkeyGUI] Discord:", DISCORD_LINK)
-	end
-	pcall(function()
-		game:GetService("StarterGui"):SetCore("SendNotification", {
-			Title = "Discord",
-			Text = "Link kopiert!",
-			Duration = 3
-		})
-	end)
+	if setclipboard then setclipboard(CFG.DISCORD) end
+	print("[MonkeyGUI] Discord:", CFG.DISCORD)
 end)
 
 local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, -100, 1, 0)
-titleLabel.Position = UDim2.new(0, 62, 0, 0)
+titleLabel.Size = UDim2.new(1,-100,1,0)
+titleLabel.Position = UDim2.new(0,62,0,0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "MonkeyGUI  v" .. VERSION
-titleLabel.TextColor3 = Color3.fromRGB(230, 230, 245)
+titleLabel.Text = "MonkeyGUI  v"..CFG.VERSION
+titleLabel.TextColor3 = CFG.COL_TEXT
 titleLabel.TextSize = 12
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.Parent = titleBar
 
-local minimizeButton = Instance.new("TextButton")
-minimizeButton.Size = UDim2.new(0, 26, 0, 26)
-minimizeButton.Position = UDim2.new(1, -58, 0, 4)
-minimizeButton.BackgroundColor3 = COL_BTN
-minimizeButton.BackgroundTransparency = 0
-minimizeButton.BorderSizePixel = 0
-minimizeButton.Text = "−"
-minimizeButton.TextColor3 = Color3.fromRGB(220, 220, 235)
-minimizeButton.TextSize = 18
-minimizeButton.Font = Enum.Font.GothamBold
-minimizeButton.AutoButtonColor = false
-minimizeButton.Parent = titleBar
+local minBtn = Instance.new("TextButton")
+minBtn.Size = UDim2.new(0,26,0,26)
+minBtn.Position = UDim2.new(1,-58,0,4)
+minBtn.BackgroundColor3 = CFG.COL_BTN
+minBtn.Text = "-"
+minBtn.TextColor3 = CFG.COL_TEXT
+minBtn.TextSize = 18
+minBtn.Font = Enum.Font.GothamBold
+minBtn.AutoButtonColor = false
+minBtn.Parent = titleBar
+corner(minBtn, 6)
 
-local minCorner = Instance.new("UICorner")
-minCorner.CornerRadius = UDim.new(0, 6)
-minCorner.Parent = minimizeButton
-
-local closeButton = Instance.new("TextButton")
-closeButton.Size = UDim2.new(0, 26, 0, 26)
-closeButton.Position = UDim2.new(1, -28, 0, 4)
-closeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 60)
-closeButton.BackgroundTransparency = 0
-closeButton.BorderSizePixel = 0
-closeButton.Text = "×"
-closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-closeButton.TextSize = 18
-closeButton.Font = Enum.Font.GothamBold
-closeButton.AutoButtonColor = false
-closeButton.Parent = titleBar
-
-local closeCorner = Instance.new("UICorner")
-closeCorner.CornerRadius = UDim.new(0, 6)
-closeCorner.Parent = closeButton
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0,26,0,26)
+closeBtn.Position = UDim2.new(1,-28,0,4)
+closeBtn.BackgroundColor3 = Color3.fromRGB(200,50,60)
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.new(1,1,1)
+closeBtn.TextSize = 18
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.AutoButtonColor = false
+closeBtn.Parent = titleBar
+corner(closeBtn, 6)
 
 local body = Instance.new("Frame")
-body.Size = UDim2.new(1, 0, 1, -TITLE_H)
-body.Position = UDim2.new(0, 0, 0, TITLE_H)
+body.Size = UDim2.new(1,0,1,-CFG.TITLE_H)
+body.Position = UDim2.new(0,0,0,CFG.TITLE_H)
 body.BackgroundTransparency = 1
-body.Parent = mainFrame
+body.Parent = main
 
 local sidebar = Instance.new("Frame")
-sidebar.Size = UDim2.new(0, SIDEBAR_W, 1, 0)
-sidebar.BackgroundColor3 = COL_SIDE
-sidebar.BackgroundTransparency = 0
+sidebar.Size = UDim2.new(0,CFG.SIDEBAR_W,1,0)
+sidebar.BackgroundColor3 = CFG.COL_SIDE
 sidebar.BorderSizePixel = 0
 sidebar.Parent = body
+local sideLayout = Instance.new("UIListLayout")
+sideLayout.Padding = UDim.new(0,4)
+sideLayout.SortOrder = Enum.SortOrder.LayoutOrder
+sideLayout.Parent = sidebar
+local sidePad = Instance.new("UIPadding")
+sidePad.PaddingTop = UDim.new(0,6)
+sidePad.PaddingLeft = UDim.new(0,5)
+sidePad.PaddingRight = UDim.new(0,5)
+sidePad.Parent = sidebar
 
-local sidebarLayout = Instance.new("UIListLayout")
-sidebarLayout.Padding = UDim.new(0, 4)
-sidebarLayout.SortOrder = Enum.SortOrder.LayoutOrder
-sidebarLayout.Parent = sidebar
+local content = Instance.new("Frame")
+content.Size = UDim2.new(1,-CFG.SIDEBAR_W,1,0)
+content.Position = UDim2.new(0,CFG.SIDEBAR_W,0,0)
+content.BackgroundTransparency = 1
+content.ClipsDescendants = true
+content.Parent = body
 
-local sidebarPadding = Instance.new("UIPadding")
-sidebarPadding.PaddingTop = UDim.new(0, 6)
-sidebarPadding.PaddingLeft = UDim.new(0, 5)
-sidebarPadding.PaddingRight = UDim.new(0, 5)
-sidebarPadding.Parent = sidebar
-
-local contentArea = Instance.new("Frame")
-contentArea.Size = UDim2.new(1, -SIDEBAR_W, 1, 0)
-contentArea.Position = UDim2.new(0, SIDEBAR_W, 0, 0)
-contentArea.BackgroundTransparency = 1
-contentArea.ClipsDescendants = true
-contentArea.Parent = body
-
--- ====================== TAB SYSTEM ======================
-local tabs = {}
-local currentTab = nil
+local tabs, currentTab = {}, nil
 
 local function createTab(name, order)
-	local tabBtn = Instance.new("TextButton")
-	tabBtn.Name = name
-	tabBtn.Size = UDim2.new(1, 0, 0, TAB_H)
-	tabBtn.BackgroundColor3 = COL_BTN
-	tabBtn.BackgroundTransparency = 0
-	tabBtn.BorderSizePixel = 0
-	tabBtn.Text = name
-	tabBtn.TextColor3 = COL_MUTED
-	tabBtn.TextSize = 10
-	tabBtn.Font = Enum.Font.GothamBold
-	tabBtn.AutoButtonColor = false
-	tabBtn.LayoutOrder = order
-	tabBtn.Parent = sidebar
-
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 6)
-	corner.Parent = tabBtn
-
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1,0,0,CFG.TAB_H)
+	btn.BackgroundColor3 = CFG.COL_BTN
+	btn.BorderSizePixel = 0
+	btn.Text = name
+	btn.TextColor3 = CFG.COL_MUTED
+	btn.TextSize = 10
+	btn.Font = Enum.Font.GothamBold
+	btn.AutoButtonColor = false
+	btn.LayoutOrder = order
+	btn.Parent = sidebar
+	corner(btn, 6)
 	local page = Instance.new("ScrollingFrame")
-	page.Name = name .. "Page"
-	page.Size = UDim2.new(1, 0, 1, 0)
+	page.Size = UDim2.new(1,0,1,0)
 	page.BackgroundTransparency = 1
 	page.BorderSizePixel = 0
 	page.ScrollBarThickness = 3
-	page.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 130)
-	page.CanvasSize = UDim2.new(0, 0, 0, 0)
+	page.CanvasSize = UDim2.new(0,0,0,0)
 	page.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	page.Visible = false
-	page.Parent = contentArea
-
-	local pageLayout = Instance.new("UIListLayout")
-	pageLayout.Padding = UDim.new(0, 6)
-	pageLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	pageLayout.Parent = page
-
-	local pagePadding = Instance.new("UIPadding")
-	pagePadding.PaddingTop = UDim.new(0, 8)
-	pagePadding.PaddingLeft = UDim.new(0, 8)
-	pagePadding.PaddingRight = UDim.new(0, 8)
-	pagePadding.PaddingBottom = UDim.new(0, 8)
-	pagePadding.Parent = page
-
-	tabs[name] = {button = tabBtn, page = page}
-	tabBtn.MouseButton1Click:Connect(function()
+	page.Parent = content
+	local lay = Instance.new("UIListLayout")
+	lay.Padding = UDim.new(0,6)
+	lay.SortOrder = Enum.SortOrder.LayoutOrder
+	lay.Parent = page
+	local pad = Instance.new("UIPadding")
+	pad.PaddingTop = UDim.new(0,8)
+	pad.PaddingLeft = UDim.new(0,8)
+	pad.PaddingRight = UDim.new(0,8)
+	pad.PaddingBottom = UDim.new(0,8)
+	pad.Parent = page
+	tabs[name] = {button=btn, page=page}
+	btn.MouseButton1Click:Connect(function()
 		if currentTab == name then return end
-		switchTab(name)
+		for n,t in pairs(tabs) do
+			local on = (n == name)
+			t.page.Visible = on
+			t.button.BackgroundColor3 = on and CFG.COL_ACCENT or CFG.COL_BTN
+			t.button.TextColor3 = on and Color3.new(1,1,1) or CFG.COL_MUTED
+		end
+		currentTab = name
 	end)
 	return page
-end
-
-function switchTab(name)
-	for tabName, data in pairs(tabs) do
-		if tabName == name then
-			data.page.Visible = true
-			TweenService:Create(data.button, TweenInfo.new(0.2), {
-				BackgroundColor3 = COL_ACCENT,
-				BackgroundTransparency = 0,
-				TextColor3 = Color3.fromRGB(255, 255, 255)
-			}):Play()
-		else
-			data.page.Visible = false
-			TweenService:Create(data.button, TweenInfo.new(0.2), {
-				BackgroundColor3 = COL_BTN,
-				BackgroundTransparency = 0,
-				TextColor3 = COL_MUTED
-			}):Play()
-		end
-	end
-	currentTab = name
 end
 
 local vipPage = createTab("Farm VIP", 1)
@@ -440,1781 +295,755 @@ local teleportPage = createTab("Teleport", 5)
 local otherPage = createTab("Other", 6)
 local settingsPage = createTab("Settings", 7)
 
--- ====================== BUTTONS ======================
-local function createToggleButton(parent, name, text, layoutOrder)
+local function makeToggle(parent, text, order)
 	local btn = Instance.new("TextButton")
-	btn.Name = name
-	btn.Size = UDim2.new(1, 0, 0, BTN_H)
-	btn.BackgroundColor3 = COL_BTN
-	btn.BackgroundTransparency = 0
+	btn.Size = UDim2.new(1,0,0,CFG.BTN_H)
+	btn.BackgroundColor3 = CFG.COL_BTN
 	btn.BorderSizePixel = 0
 	btn.Text = text
-	btn.TextColor3 = COL_TEXT
+	btn.TextColor3 = CFG.COL_TEXT
 	btn.TextSize = 12
 	btn.Font = Enum.Font.GothamBold
 	btn.AutoButtonColor = false
-	btn.LayoutOrder = layoutOrder
+	btn.LayoutOrder = order
 	btn.Parent = parent
-
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 7)
-	corner.Parent = btn
-
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = COL_STROKE
-	stroke.Thickness = 1
-	stroke.Transparency = 0.35
-	stroke.Parent = btn
-	return btn, stroke
+	corner(btn, 7)
+	local st = stroke(btn)
+	return btn, st
 end
 
-local function createVisualRow(parent, labelText, layoutOrder)
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, 0, 0, 14)
-	label.BackgroundTransparency = 1
-	label.Text = labelText
-	label.TextColor3 = Color3.fromRGB(200, 200, 220)
-	label.TextSize = 11
-	label.Font = Enum.Font.Gotham
-	label.TextXAlignment = Enum.TextXAlignment.Left
-	label.LayoutOrder = layoutOrder
-	label.Parent = parent
-
-	local box = Instance.new("TextBox")
-	box.Size = UDim2.new(1, 0, 0, 28)
-	box.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
-	box.BorderSizePixel = 0
-	box.PlaceholderText = labelText .. " eingeben..."
-	box.Text = ""
-	box.TextColor3 = Color3.fromRGB(255, 255, 255)
-	box.TextSize = 12
-	box.Font = Enum.Font.Gotham
-	box.ClearTextOnFocus = false
-	box.LayoutOrder = layoutOrder + 1
-	box.Parent = parent
-
-	local boxCorner = Instance.new("UICorner")
-	boxCorner.CornerRadius = UDim.new(0, 6)
-	boxCorner.Parent = box
-
-	local row = Instance.new("Frame")
-	row.Size = UDim2.new(1, 0, 0, 28)
-	row.BackgroundTransparency = 1
-	row.LayoutOrder = layoutOrder + 2
-	row.Parent = parent
-
-	local enterBtn = Instance.new("TextButton")
-	enterBtn.Size = UDim2.new(0.48, 0, 1, 0)
-	enterBtn.BackgroundColor3 = Color3.fromRGB(80, 60, 180)
-	enterBtn.BorderSizePixel = 0
-	enterBtn.Text = "Enter"
-	enterBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-	enterBtn.TextSize = 11
-	enterBtn.Font = Enum.Font.GothamBold
-	enterBtn.AutoButtonColor = false
-	enterBtn.Parent = row
-
-	local enterCorner = Instance.new("UICorner")
-	enterCorner.CornerRadius = UDim.new(0, 6)
-	enterCorner.Parent = enterBtn
-
-	local resetBtn = Instance.new("TextButton")
-	resetBtn.Size = UDim2.new(0.48, 0, 1, 0)
-	resetBtn.Position = UDim2.new(0.52, 0, 0, 0)
-	resetBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 75)
-	resetBtn.BorderSizePixel = 0
-	resetBtn.Text = "Reset"
-	resetBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-	resetBtn.TextSize = 11
-	resetBtn.Font = Enum.Font.GothamBold
-	resetBtn.AutoButtonColor = false
-	resetBtn.Parent = row
-
-	local resetCorner = Instance.new("UICorner")
-	resetCorner.CornerRadius = UDim.new(0, 6)
-	resetCorner.Parent = resetBtn
-
-	return box, enterBtn, resetBtn
+local function setToggle(btn, st, on, onT, offT)
+	btn.Text = on and onT or offT
+	btn.BackgroundColor3 = on and CFG.COL_ON or CFG.COL_BTN
+	if st then st.Color = on and Color3.fromRGB(80,220,140) or CFG.COL_STROKE end
 end
 
-local vipW5Btn, vipW5Stroke = createToggleButton(vipPage, "VIP_World5", "World 5: AUS", 1)
-local vipW4Btn, vipW4Stroke = createToggleButton(vipPage, "VIP_World4", "World 4: AUS", 2)
-local vipW3Btn, vipW3Stroke = createToggleButton(vipPage, "VIP_World3", "World 3: AUS", 3)
-local vipW2Btn, vipW2Stroke = createToggleButton(vipPage, "VIP_World2", "World 2: AUS", 4)
-local vipW1Btn, vipW1Stroke = createToggleButton(vipPage, "VIP_World1", "World 1: AUS", 5)
-
-local norW5Btn, norW5Stroke = createToggleButton(normalPage, "NOR_World5", "World 5: AUS", 1)
-local norW4Btn, norW4Stroke = createToggleButton(normalPage, "NOR_World4", "World 4: AUS", 2)
-local norW3Btn, norW3Stroke = createToggleButton(normalPage, "NOR_World3", "World 3: AUS", 3)
-local norW2Btn, norW2Stroke = createToggleButton(normalPage, "NOR_World2", "World 2: AUS", 4)
-local norW1Btn, norW1Stroke = createToggleButton(normalPage, "NOR_World1", "World 1: AUS", 5)
-
-local speedButton, speedStroke = createToggleButton(speedPage, "SpeedToggle", "Speed Boost: AUS", 1)
-
-local keybindButton = Instance.new("TextButton")
-keybindButton.Name = "KeybindButton"
-keybindButton.Size = UDim2.new(1, 0, 0, 30)
-keybindButton.BackgroundColor3 = Color3.fromRGB(45, 45, 60)
-keybindButton.BorderSizePixel = 0
-keybindButton.Text = "Keybind: [E]"
-keybindButton.TextColor3 = Color3.fromRGB(200, 200, 220)
-keybindButton.TextSize = 11
-keybindButton.Font = Enum.Font.Gotham
-keybindButton.AutoButtonColor = false
-keybindButton.LayoutOrder = 2
-keybindButton.Parent = speedPage
-
-local keybindCorner = Instance.new("UICorner")
-keybindCorner.CornerRadius = UDim.new(0, 6)
-keybindCorner.Parent = keybindButton
-
-local keybindHint = Instance.new("TextLabel")
-keybindHint.Size = UDim2.new(1, 0, 0, 16)
-keybindHint.BackgroundTransparency = 1
-keybindHint.Text = "Tippe zum Ändern"
-keybindHint.TextColor3 = Color3.fromRGB(120, 120, 140)
-keybindHint.TextSize = 10
-keybindHint.Font = Enum.Font.Gotham
-keybindHint.LayoutOrder = 3
-keybindHint.Parent = speedPage
-
--- ====================== TELEPORT TAB ======================
-local TELEPORT_SPOTS = {
-	{name = "World 1", pos = Vector3.new(-438.6725158691406, 28.736703872680664, -221.16766357421875)},
-	{name = "World 2", pos = Vector3.new(-439.3213195800781, 28.80070686340332, -2532.548095703125)},
-	{name = "World 3", pos = Vector3.new(-439.3213195800781, 28.736703872680664, 2775.951904296875)},
-	{name = "World 4", pos = Vector3.new(-439.3211975097656, 28.736703872680664, 5775.9521484375)},
-	{name = "World 5", pos = Vector3.new(-439.3211975097656, 28.736703872680664, 7596.9521484375)},
-}
-
-local function teleportTo(pos)
+local function tpTo(pos)
 	local char = player.Character
-	if not char then return end
-	local hrp = char:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
-	hrp.CFrame = CFrame.new(pos)
-	print("[MonkeyGUI] Teleport →", pos)
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if hrp then hrp.CFrame = CFrame.new(pos) end
 end
 
-local teleportBtns = {}
-for i, spot in ipairs(TELEPORT_SPOTS) do
-	local btn = Instance.new("TextButton")
-	btn.Name = "TP_" .. spot.name:gsub(" ", "")
-	btn.Size = UDim2.new(1, 0, 0, BTN_H)
-	btn.BackgroundColor3 = COL_BTN
-	btn.BorderSizePixel = 0
-	btn.Text = "Teleport " .. spot.name
-	btn.TextColor3 = COL_TEXT
-	btn.TextSize = 12
-	btn.Font = Enum.Font.GothamBold
-	btn.AutoButtonColor = false
-	btn.LayoutOrder = i
-	btn.Parent = teleportPage
-	local c = Instance.new("UICorner")
-	c.CornerRadius = UDim.new(0, 7)
-	c.Parent = btn
-	local st = Instance.new("UIStroke")
-	st.Color = COL_STROKE
-	st.Thickness = 1
-	st.Transparency = 0.35
-	st.Parent = btn
+local function setInv(part, store)
+	if not part then return end
+	local function apply(o)
+		if o:IsA("BasePart") then
+			if not store[o] then store[o] = {CanCollide=o.CanCollide, Transparency=o.Transparency} end
+			o.CanCollide = false
+			o.Transparency = 1
+		end
+	end
+	if part:IsA("BasePart") then apply(part)
+	elseif part:IsA("Model") then for _,d in ipairs(part:GetDescendants()) do apply(d) end end
+end
+
+local function restore(part, store)
+	if not part then return end
+	local function rest(o)
+		if o:IsA("BasePart") and store[o] then
+			o.CanCollide = store[o].CanCollide
+			o.Transparency = store[o].Transparency
+			store[o] = nil
+		end
+	end
+	if part:IsA("BasePart") then rest(part)
+	elseif part:IsA("Model") then for _,d in ipairs(part:GetDescendants()) do rest(d) end end
+end
+
+local function makeWorld(page, label, order, worldName, stageName, winName, pos, useFinal)
+	local btn, st = makeToggle(page, label..": AUS", order)
+	local on, conn, store, partRef = false, nil, {}, nil
+	local function getPart()
+		local map = workspace:FindFirstChild("Map")
+		if not map then return nil end
+		local world = map:FindFirstChild(worldName)
+		if not world then return nil end
+		local stages = world:FindFirstChild("Stages")
+		if not stages then return nil end
+		local stage = stages:FindFirstChild(stageName)
+		if not stage then return nil end
+		if useFinal then
+			local fd = stage:FindFirstChild("FinalDestination")
+			stage = fd or stage
+		end
+		local win = stage:FindFirstChild(winName)
+		if not win then return nil end
+		return win:FindFirstChild("Button") or win
+	end
 	btn.MouseButton1Click:Connect(function()
-		teleportTo(spot.pos)
+		on = not on
+		setToggle(btn, st, on, label..": AN", label..": AUS")
+		if on then
+			tpTo(pos)
+			if conn then conn:Disconnect() end
+			conn = RunService.Heartbeat:Connect(function()
+				local char = player.Character
+				local hrp = char and char:FindFirstChild("HumanoidRootPart")
+				if not hrp then return end
+				local part = getPart()
+				if part then
+					partRef = part
+					setInv(part, store)
+					if part:IsA("Model") then
+						part:PivotTo(hrp.CFrame)
+					elseif part:IsA("BasePart") then
+						part.CFrame = hrp.CFrame
+					end
+				end
+			end)
+		else
+			if conn then conn:Disconnect() conn = nil end
+			restore(partRef or getPart(), store)
+			partRef = nil
+		end
 	end)
-	teleportBtns[i] = btn
 end
 
-local speedFarmBtn, speedFarmStroke = createToggleButton(otherPage, "SpeedFarm", "Speed Farm: AUS", 1)
-local immortalBtn, immortalStroke = createToggleButton(otherPage, "Immortal", "Immortal: AUS", 2)
+makeWorld(vipPage, "World 5", 1, "World5", "Stage3", "VipWin", CFG.TP.W5, false)
+makeWorld(vipPage, "World 4", 2, "World4", "Stage9", "VipWin", CFG.TP.W4, false)
+makeWorld(vipPage, "World 3", 3, "World3", "Stage7", "VipWin", CFG.TP.W3, false)
+makeWorld(vipPage, "World 2", 4, "World2", "Stage9", "VipWin", CFG.TP.W2, true)
+makeWorld(vipPage, "World 1", 5, "World1", "Stage9", "VipWin", CFG.TP.W1, false)
+makeWorld(normalPage, "World 5", 1, "World5", "Stage3", "NormalWin", CFG.TP.W5, false)
+makeWorld(normalPage, "World 4", 2, "World4", "Stage9", "NormalWin", CFG.TP.W4, false)
+makeWorld(normalPage, "World 3", 3, "World3", "Stage7", "NormalWin", CFG.TP.W3, false)
+makeWorld(normalPage, "World 2", 4, "World2", "Stage9", "NormalWin", CFG.TP.W2, true)
+makeWorld(normalPage, "World 1", 5, "World1", "Stage9", "NormalWin", CFG.TP.W1, false)
 
--- ====================== SPEED RUN UI ======================
-local speedRunOn = false
-local speedRunBtn, speedRunStroke = createToggleButton(speedRunPage, "SpeedRunToggle", "Speed Run: AUS", 1)
+-- Speed Boost
+local speedBtn, speedSt = makeToggle(speedPage, "Speed Boost: AUS", 1)
+local keybindBtn = Instance.new("TextButton")
+keybindBtn.Size = UDim2.new(1,0,0,CFG.BTN_H)
+keybindBtn.BackgroundColor3 = CFG.COL_BTN
+keybindBtn.BorderSizePixel = 0
+keybindBtn.Text = "Keybind: [E]"
+keybindBtn.TextColor3 = CFG.COL_TEXT
+keybindBtn.TextSize = 12
+keybindBtn.Font = Enum.Font.GothamBold
+keybindBtn.AutoButtonColor = false
+keybindBtn.LayoutOrder = 2
+keybindBtn.Parent = speedPage
+corner(keybindBtn, 7)
 
-local timerStatusLabel = Instance.new("TextLabel")
-timerStatusLabel.Size = UDim2.new(1, 0, 0, 18)
-timerStatusLabel.BackgroundTransparency = 1
-timerStatusLabel.Text = "Status: Bereit"
-timerStatusLabel.TextColor3 = COL_MUTED
-timerStatusLabel.TextSize = 11
-timerStatusLabel.Font = Enum.Font.Gotham
-timerStatusLabel.LayoutOrder = 2
-timerStatusLabel.Parent = speedRunPage
-
-local recordsTitle = Instance.new("TextLabel")
-recordsTitle.Size = UDim2.new(1, 0, 0, 18)
-recordsTitle.BackgroundTransparency = 1
-recordsTitle.Text = "— Rekorde —"
-recordsTitle.TextColor3 = COL_MUTED
-recordsTitle.TextSize = 11
-recordsTitle.Font = Enum.Font.GothamBold
-recordsTitle.LayoutOrder = 3
-recordsTitle.Parent = speedRunPage
-
-local recordLabels = {}
-local recordResetBtns = {}
-for i = 1, 5 do
-	local row = Instance.new("Frame")
-	row.Size = UDim2.new(1, 0, 0, 26)
-	row.BackgroundTransparency = 1
-	row.LayoutOrder = 3 + i
-	row.Parent = speedRunPage
-
-	local lbl = Instance.new("TextLabel")
-	lbl.Size = UDim2.new(1, -52, 1, 0)
-	lbl.BackgroundColor3 = COL_BTN
-	lbl.BorderSizePixel = 0
-	lbl.Text = "World " .. i .. ":  --.--"
-	lbl.TextColor3 = COL_TEXT
-	lbl.TextSize = 12
-	lbl.Font = Enum.Font.Gotham
-	lbl.Parent = row
-	local c = Instance.new("UICorner")
-	c.CornerRadius = UDim.new(0, 6)
-	c.Parent = lbl
-	recordLabels[i] = lbl
-
-	local rbtn = Instance.new("TextButton")
-	rbtn.Size = UDim2.new(0, 48, 1, 0)
-	rbtn.Position = UDim2.new(1, -48, 0, 0)
-	rbtn.BackgroundColor3 = Color3.fromRGB(160, 55, 65)
-	rbtn.BorderSizePixel = 0
-	rbtn.Text = "Reset"
-	rbtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-	rbtn.TextSize = 10
-	rbtn.Font = Enum.Font.GothamBold
-	rbtn.AutoButtonColor = false
-	rbtn.Parent = row
-	local rc = Instance.new("UICorner")
-	rc.CornerRadius = UDim.new(0, 6)
-	rc.Parent = rbtn
-	recordResetBtns[i] = rbtn
+local speedThread = nil
+local function toggleSpeed()
+	State.speedOn = not State.speedOn
+	setToggle(speedBtn, speedSt, State.speedOn, "Speed Boost: AN", "Speed Boost: AUS")
+	if State.speedOn then
+		speedThread = task.spawn(function()
+			while State.speedOn do
+				task.wait(0)
+				if levelValue then levelValue.Value = 1000 end
+			end
+		end)
+	else
+		if speedThread then task.cancel(speedThread) speedThread = nil end
+		if levelValue and leaderLevel then levelValue.Value = leaderLevel.Value end
+	end
 end
+speedBtn.MouseButton1Click:Connect(toggleSpeed)
+keybindBtn.MouseButton1Click:Connect(function()
+	State.rebinding = true
+	keybindBtn.Text = "Taste druecken..."
+end)
+UIS.InputBegan:Connect(function(input, gp)
+	if gp then return end
+	if State.rebinding and input.UserInputType == Enum.UserInputType.Keyboard then
+		State.speedKey = input.KeyCode
+		State.rebinding = false
+		keybindBtn.Text = "Keybind: ["..tostring(input.KeyCode):gsub("Enum.KeyCode.","").."]"
+		return
+	end
+	if input.KeyCode == State.speedKey then toggleSpeed() end
+end)
 
-local resetAllRecordsBtn = Instance.new("TextButton")
-resetAllRecordsBtn.Size = UDim2.new(1, 0, 0, 28)
-resetAllRecordsBtn.BackgroundColor3 = Color3.fromRGB(120, 50, 60)
-resetAllRecordsBtn.BorderSizePixel = 0
-resetAllRecordsBtn.Text = "Alle Rekorde löschen"
-resetAllRecordsBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-resetAllRecordsBtn.TextSize = 11
-resetAllRecordsBtn.Font = Enum.Font.GothamBold
-resetAllRecordsBtn.AutoButtonColor = false
-resetAllRecordsBtn.LayoutOrder = 10
-resetAllRecordsBtn.Parent = speedRunPage
-local resetAllCorner = Instance.new("UICorner")
-resetAllCorner.CornerRadius = UDim.new(0, 7)
-resetAllCorner.Parent = resetAllRecordsBtn
-
--- Overlay Timer (draggable)
+-- Speed Run
+local srBtn, srSt = makeToggle(speedRunPage, "Speed Run: AUS", 1)
 local timerOverlay = Instance.new("TextButton")
-timerOverlay.Name = "SpeedRunTimer"
-timerOverlay.Size = UDim2.new(0, 140, 0, 36)
-timerOverlay.Position = UDim2.new(0.5, -70, 0, 20)
-timerOverlay.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+timerOverlay.Size = UDim2.new(0,140,0,36)
+timerOverlay.Position = UDim2.new(0.5,-70,0,20)
+timerOverlay.BackgroundColor3 = Color3.fromRGB(18,18,24)
 timerOverlay.BackgroundTransparency = 0.25
 timerOverlay.BorderSizePixel = 0
 timerOverlay.Text = "0.00"
-timerOverlay.TextColor3 = Color3.fromRGB(255, 255, 255)
+timerOverlay.TextColor3 = Color3.new(1,1,1)
 timerOverlay.TextSize = 22
 timerOverlay.Font = Enum.Font.GothamBold
 timerOverlay.AutoButtonColor = false
 timerOverlay.Visible = false
 timerOverlay.ZIndex = 50
-timerOverlay.Parent = screenGui
+timerOverlay.Parent = sg
+corner(timerOverlay, 8)
+stroke(timerOverlay, CFG.COL_ACCENT, 1.5, 0.3)
 
-local timerOverlayCorner = Instance.new("UICorner")
-timerOverlayCorner.CornerRadius = UDim.new(0, 8)
-timerOverlayCorner.Parent = timerOverlay
-
-local timerOverlayStroke = Instance.new("UIStroke")
-timerOverlayStroke.Color = COL_ACCENT
-timerOverlayStroke.Thickness = 1.5
-timerOverlayStroke.Transparency = 0.3
-timerOverlayStroke.Parent = timerOverlay
-
--- Timer draggen
 do
-	local draggingTimer = false
-	local tDragStart, tStartPos
+	local drag,d0,p0 = false,nil,nil
 	timerOverlay.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			draggingTimer = true
-			tDragStart = input.Position
-			tStartPos = timerOverlay.Position
+			drag = true; d0 = input.Position; p0 = timerOverlay.Position
 			input.Changed:Connect(function()
-				if input.UserInputState == Enum.UserInputState.End then draggingTimer = false end
+				if input.UserInputState == Enum.UserInputState.End then drag = false end
 			end)
 		end
 	end)
-	UserInputService.InputChanged:Connect(function(input)
-		if draggingTimer and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-			local delta = input.Position - tDragStart
-			timerOverlay.Position = UDim2.new(tStartPos.X.Scale, tStartPos.X.Offset + delta.X, tStartPos.Y.Scale, tStartPos.Y.Offset + delta.Y)
+	UIS.InputChanged:Connect(function(input)
+		if drag and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			local d = input.Position - d0
+			timerOverlay.Position = UDim2.new(p0.X.Scale, p0.X.Offset+d.X, p0.Y.Scale, p0.Y.Offset+d.Y)
 		end
 	end)
 end
 
--- ====================== SETTINGS (Farben + Color Picker) ======================
-local function makeColorRow(parent, order)
-	local row = Instance.new("Frame")
-	row.Size = UDim2.new(1, 0, 0, 26)
-	row.BackgroundTransparency = 1
-	row.LayoutOrder = order
-	row.Parent = parent
-	local layout = Instance.new("UIListLayout")
-	layout.FillDirection = Enum.FillDirection.Horizontal
-	layout.Padding = UDim.new(0, 3)
-	layout.Parent = row
-	return row
-end
-
-local function fillPresetRow(row, presets, listOut)
-	for i, preset in ipairs(presets) do
-		local b = Instance.new("TextButton")
-		b.Size = UDim2.new(0, 24, 0, 24)
-		b.BackgroundColor3 = preset.color
-		b.BorderSizePixel = 0
-		b.Text = ""
-		b.AutoButtonColor = false
-		b:SetAttribute("NoTheme", true) -- Farbe-Auswahl nicht umfärben
-		b.Parent = row
-		local bc = Instance.new("UICorner")
-		bc.CornerRadius = UDim.new(0, 5)
-		bc.Parent = b
-		local st = Instance.new("UIStroke")
-		st.Color = Color3.fromRGB(90, 90, 110)
-		st.Thickness = 1
-		st.Transparency = 0.4
-		st.Parent = b
-		listOut[i] = {btn = b, color = preset.color, name = preset.name}
-	end
-end
-
--- Sortiert: Rot → Orange → Gelb → Grün → Cyan → Blau → Lila → Pink → Neutral
-local ACCENT_PRESETS = {
-	{name="Rot", color=Color3.fromRGB(220, 50, 60)},
-	{name="Orange", color=Color3.fromRGB(230, 120, 40)},
-	{name="Gelb", color=Color3.fromRGB(230, 190, 40)},
-	{name="Grün", color=Color3.fromRGB(40, 180, 90)},
-	{name="Mint", color=Color3.fromRGB(60, 210, 160)},
-	{name="Cyan", color=Color3.fromRGB(40, 200, 220)},
-	{name="Blau", color=Color3.fromRGB(40, 120, 255)},
-	{name="Indigo", color=Color3.fromRGB(70, 80, 220)},
-	{name="Lila", color=Color3.fromRGB(100, 80, 220)},
-	{name="Pink", color=Color3.fromRGB(220, 80, 160)},
-	{name="Weiß", color=Color3.fromRGB(230, 230, 240)},
-}
-
-local BTN_PRESETS = {
-	{name="Schwarz", color=Color3.fromRGB(22, 22, 28)},
-	{name="Dunkel", color=Color3.fromRGB(35, 35, 48)},
-	{name="Grau", color=Color3.fromRGB(55, 55, 70)},
-	{name="Blau", color=Color3.fromRGB(30, 40, 70)},
-	{name="Grün", color=Color3.fromRGB(28, 50, 38)},
-	{name="Rot", color=Color3.fromRGB(55, 28, 32)},
-	{name="Lila", color=Color3.fromRGB(42, 32, 60)},
-	{name="Braun", color=Color3.fromRGB(50, 38, 30)},
-	{name="Teal", color=Color3.fromRGB(28, 48, 52)},
-	{name="Hell", color=Color3.fromRGB(70, 72, 88)},
-}
-
-local FRAME_PRESETS = {
-	{name="Schwarz", color=Color3.fromRGB(10, 10, 12)},
-	{name="Dunkel", color=Color3.fromRGB(18, 18, 24)},
-	{name="Grau", color=Color3.fromRGB(28, 28, 36)},
-	{name="Blau", color=Color3.fromRGB(18, 24, 42)},
-	{name="Grün", color=Color3.fromRGB(16, 32, 24)},
-	{name="Lila", color=Color3.fromRGB(26, 18, 38)},
-	{name="Rot", color=Color3.fromRGB(36, 18, 22)},
-	{name="Teal", color=Color3.fromRGB(16, 30, 34)},
-	{name="Hell", color=Color3.fromRGB(42, 42, 52)},
-	{name="Nacht", color=Color3.fromRGB(12, 14, 22)},
-}
-
-local function addSectionLabel(text, order)
-	local lbl = Instance.new("TextLabel")
-	lbl.Size = UDim2.new(1, 0, 0, 16)
-	lbl.BackgroundTransparency = 1
-	lbl.Text = text
-	lbl.TextColor3 = COL_MUTED
-	lbl.TextSize = 11
-	lbl.Font = Enum.Font.GothamBold
-	lbl.TextXAlignment = Enum.TextXAlignment.Left
-	lbl.LayoutOrder = order
-	lbl.Parent = settingsPage
-	return lbl
-end
-
-addSectionLabel("Tab / Accent", 1)
-local accentColorRow = makeColorRow(settingsPage, 2)
-local accentColorBtns = {}
-fillPresetRow(accentColorRow, ACCENT_PRESETS, accentColorBtns)
-
-addSectionLabel("Buttons (alle)", 3)
-local btnColorRow = makeColorRow(settingsPage, 4)
-local btnColorBtns = {}
-fillPresetRow(btnColorRow, BTN_PRESETS, btnColorBtns)
-
-addSectionLabel("Frame", 5)
-local frameColorRow = makeColorRow(settingsPage, 6)
-local frameColorBtns = {}
-fillPresetRow(frameColorRow, FRAME_PRESETS, frameColorBtns)
-
-local openPickerBtn = Instance.new("TextButton")
-openPickerBtn.Size = UDim2.new(1, 0, 0, 32)
-openPickerBtn.BackgroundColor3 = COL_ACCENT
-openPickerBtn.BorderSizePixel = 0
-openPickerBtn.Text = "Custom Color Picker"
-openPickerBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-openPickerBtn.TextSize = 12
-openPickerBtn.Font = Enum.Font.GothamBold
-openPickerBtn.AutoButtonColor = false
-openPickerBtn.LayoutOrder = 8
-openPickerBtn:SetAttribute("NoTheme", true)
-openPickerBtn.Parent = settingsPage
-local openPickerCorner = Instance.new("UICorner")
-openPickerCorner.CornerRadius = UDim.new(0, 7)
-openPickerCorner.Parent = openPickerBtn
-
-local resetColorsBtn = Instance.new("TextButton")
-resetColorsBtn.Size = UDim2.new(1, 0, 0, 30)
-resetColorsBtn.BackgroundColor3 = Color3.fromRGB(160, 55, 65)
-resetColorsBtn.BorderSizePixel = 0
-resetColorsBtn.Text = "Farben zurücksetzen"
-resetColorsBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-resetColorsBtn.TextSize = 12
-resetColorsBtn.Font = Enum.Font.GothamBold
-resetColorsBtn.AutoButtonColor = false
-resetColorsBtn.LayoutOrder = 9
-resetColorsBtn:SetAttribute("NoTheme", true)
-resetColorsBtn.Parent = settingsPage
-local resetColorsCorner = Instance.new("UICorner")
-resetColorsCorner.CornerRadius = UDim.new(0, 7)
-resetColorsCorner.Parent = resetColorsBtn
-
--- ===== Color Picker Popup =====
-local pickerFrame = Instance.new("Frame")
-pickerFrame.Name = "ColorPicker"
-pickerFrame.Size = UDim2.new(0, 260, 0, 320)
-pickerFrame.Position = UDim2.new(0.5, -130, 0.5, -160)
-pickerFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
-pickerFrame.BorderSizePixel = 0
-pickerFrame.Visible = false
-pickerFrame.ZIndex = 30
-pickerFrame.Parent = screenGui
-local pickerCorner = Instance.new("UICorner")
-pickerCorner.CornerRadius = UDim.new(0, 12)
-pickerCorner.Parent = pickerFrame
-local pickerStroke = Instance.new("UIStroke")
-pickerStroke.Color = Color3.fromRGB(90, 90, 120)
-pickerStroke.Thickness = 1.5
-pickerStroke.Parent = pickerFrame
-
-local pickerTitle = Instance.new("TextLabel")
-pickerTitle.Size = UDim2.new(1, -40, 0, 28)
-pickerTitle.Position = UDim2.new(0, 12, 0, 8)
-pickerTitle.BackgroundTransparency = 1
-pickerTitle.Text = "Color Picker"
-pickerTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-pickerTitle.TextSize = 15
-pickerTitle.Font = Enum.Font.GothamBold
-pickerTitle.TextXAlignment = Enum.TextXAlignment.Left
-pickerTitle.ZIndex = 31
-pickerTitle.Parent = pickerFrame
-
-local pickerClose = Instance.new("TextButton")
-pickerClose.Size = UDim2.new(0, 26, 0, 26)
-pickerClose.Position = UDim2.new(1, -34, 0, 8)
-pickerClose.BackgroundColor3 = Color3.fromRGB(190, 55, 65)
-pickerClose.BorderSizePixel = 0
-pickerClose.Text = "×"
-pickerClose.TextColor3 = Color3.fromRGB(255, 255, 255)
-pickerClose.TextSize = 16
-pickerClose.Font = Enum.Font.GothamBold
-pickerClose.AutoButtonColor = false
-pickerClose.ZIndex = 31
-pickerClose.Parent = pickerFrame
-local pickerCloseCorner = Instance.new("UICorner")
-pickerCloseCorner.CornerRadius = UDim.new(0, 6)
-pickerCloseCorner.Parent = pickerClose
-
-local previewBox = Instance.new("Frame")
-previewBox.Size = UDim2.new(1, -24, 0, 36)
-previewBox.Position = UDim2.new(0, 12, 0, 42)
-previewBox.BackgroundColor3 = Color3.fromRGB(100, 80, 220)
-previewBox.BorderSizePixel = 0
-previewBox.ZIndex = 31
-previewBox.Parent = pickerFrame
-local previewCorner = Instance.new("UICorner")
-previewCorner.CornerRadius = UDim.new(0, 8)
-previewCorner.Parent = previewBox
-
-local function makeSliderRow(y, labelText, defaultVal)
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(0, 28, 0, 22)
-	label.Position = UDim2.new(0, 12, 0, y)
-	label.BackgroundTransparency = 1
-	label.Text = labelText
-	label.TextColor3 = COL_MUTED
-	label.TextSize = 12
-	label.Font = Enum.Font.GothamBold
-	label.ZIndex = 31
-	label.Parent = pickerFrame
-
-	local box = Instance.new("TextBox")
-	box.Size = UDim2.new(0, 44, 0, 22)
-	box.Position = UDim2.new(1, -56, 0, y)
-	box.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
-	box.BorderSizePixel = 0
-	box.Text = tostring(defaultVal)
-	box.TextColor3 = Color3.fromRGB(255, 255, 255)
-	box.TextSize = 12
-	box.Font = Enum.Font.Gotham
-	box.ZIndex = 31
-	box.Parent = pickerFrame
-	local boxC = Instance.new("UICorner")
-	boxC.CornerRadius = UDim.new(0, 5)
-	boxC.Parent = box
-
-	local barBg = Instance.new("Frame")
-	barBg.Size = UDim2.new(1, -100, 0, 10)
-	barBg.Position = UDim2.new(0, 42, 0, y + 6)
-	barBg.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
-	barBg.BorderSizePixel = 0
-	barBg.ZIndex = 31
-	barBg.Parent = pickerFrame
-	local barBgC = Instance.new("UICorner")
-	barBgC.CornerRadius = UDim.new(1, 0)
-	barBgC.Parent = barBg
-
-	local barFill = Instance.new("Frame")
-	barFill.Size = UDim2.new(defaultVal / 255, 0, 1, 0)
-	barFill.BackgroundColor3 = COL_ACCENT
-	barFill.BorderSizePixel = 0
-	barFill.ZIndex = 32
-	barFill.Parent = barBg
-	local barFillC = Instance.new("UICorner")
-	barFillC.CornerRadius = UDim.new(1, 0)
-	barFillC.Parent = barFill
-
-	return box, barBg, barFill
-end
-
-local rBox, rBar, rFill = makeSliderRow(90, "R", 100)
-local gBox, gBar, gFill = makeSliderRow(120, "G", 80)
-local bBox, bBar, bFill = makeSliderRow(150, "B", 220)
-local dBox, dBar, dFill = makeSliderRow(180, "D", 100) -- Darkness 0-100 (100=normal, 0=schwarz)
-
-local dHint = Instance.new("TextLabel")
-dHint.Size = UDim2.new(1, -24, 0, 14)
-dHint.Position = UDim2.new(0, 12, 0, 204)
-dHint.BackgroundTransparency = 1
-dHint.Text = "D = Helligkeit (0 dunkel → 100 normal)"
-dHint.TextColor3 = Color3.fromRGB(120, 120, 140)
-dHint.TextSize = 10
-dHint.Font = Enum.Font.Gotham
-dHint.ZIndex = 31
-dHint.Parent = pickerFrame
-
-local applyTarget = "accent" -- accent | buttons | frame
-
-local function makeTargetBtn(text, xScale, target)
-	local btn = Instance.new("TextButton")
-	btn.Size = UDim2.new(0.3, 0, 0, 26)
-	btn.Position = UDim2.new(xScale, 0, 0, 224)
-	btn.BackgroundColor3 = COL_BTN
-	btn.BorderSizePixel = 0
-	btn.Text = text
-	btn.TextColor3 = COL_TEXT
-	btn.TextSize = 11
-	btn.Font = Enum.Font.GothamBold
-	btn.AutoButtonColor = false
-	btn.ZIndex = 31
-	btn.Parent = pickerFrame
-	local c = Instance.new("UICorner")
-	c.CornerRadius = UDim.new(0, 6)
-	c.Parent = btn
-	return btn, target
-end
-
-local tAccent = Instance.new("TextButton")
-tAccent.Size = UDim2.new(0.3, -4, 0, 26)
-tAccent.Position = UDim2.new(0, 12, 0, 224)
-tAccent.BackgroundColor3 = COL_ACCENT
-tAccent.BorderSizePixel = 0
-tAccent.Text = "Accent"
-tAccent.TextColor3 = Color3.fromRGB(255, 255, 255)
-tAccent.TextSize = 11
-tAccent.Font = Enum.Font.GothamBold
-tAccent.AutoButtonColor = false
-tAccent.ZIndex = 31
-tAccent.Parent = pickerFrame
-Instance.new("UICorner", tAccent).CornerRadius = UDim.new(0, 6)
-
-local tButtons = Instance.new("TextButton")
-tButtons.Size = UDim2.new(0.3, -4, 0, 26)
-tButtons.Position = UDim2.new(0.35, 0, 0, 224)
-tButtons.BackgroundColor3 = COL_BTN
-tButtons.BorderSizePixel = 0
-tButtons.Text = "Buttons"
-tButtons.TextColor3 = COL_TEXT
-tButtons.TextSize = 11
-tButtons.Font = Enum.Font.GothamBold
-tButtons.AutoButtonColor = false
-tButtons.ZIndex = 31
-tButtons.Parent = pickerFrame
-Instance.new("UICorner", tButtons).CornerRadius = UDim.new(0, 6)
-
-local tFrame = Instance.new("TextButton")
-tFrame.Size = UDim2.new(0.3, -4, 0, 26)
-tFrame.Position = UDim2.new(0.68, -8, 0, 224)
-tFrame.BackgroundColor3 = COL_BTN
-tFrame.BorderSizePixel = 0
-tFrame.Text = "Frame"
-tFrame.TextColor3 = COL_TEXT
-tFrame.TextSize = 11
-tFrame.Font = Enum.Font.GothamBold
-tFrame.AutoButtonColor = false
-tFrame.ZIndex = 31
-tFrame.Parent = pickerFrame
-Instance.new("UICorner", tFrame).CornerRadius = UDim.new(0, 6)
-
-local applyPickerBtn = Instance.new("TextButton")
-applyPickerBtn.Size = UDim2.new(1, -24, 0, 34)
-applyPickerBtn.Position = UDim2.new(0, 12, 1, -48)
-applyPickerBtn.BackgroundColor3 = Color3.fromRGB(0, 140, 80)
-applyPickerBtn.BorderSizePixel = 0
-applyPickerBtn.Text = "Übernehmen"
-applyPickerBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-applyPickerBtn.TextSize = 14
-applyPickerBtn.Font = Enum.Font.GothamBold
-applyPickerBtn.AutoButtonColor = false
-applyPickerBtn.ZIndex = 31
-applyPickerBtn.Parent = pickerFrame
-Instance.new("UICorner", applyPickerBtn).CornerRadius = UDim.new(0, 8)
-
-local function clamp255(n)
-	n = tonumber(n) or 0
-	return math.clamp(math.floor(n + 0.5), 0, 255)
-end
-
-local function getPickerColor()
-	local r = clamp255(rBox.Text)
-	local g = clamp255(gBox.Text)
-	local b = clamp255(bBox.Text)
-	local d = math.clamp(tonumber(dBox.Text) or 100, 0, 100) / 100
-	rBox.Text = tostring(r)
-	gBox.Text = tostring(g)
-	bBox.Text = tostring(b)
-	dBox.Text = tostring(math.floor(d * 100 + 0.5))
-	rFill.Size = UDim2.new(r / 255, 0, 1, 0)
-	gFill.Size = UDim2.new(g / 255, 0, 1, 0)
-	bFill.Size = UDim2.new(b / 255, 0, 1, 0)
-	dFill.Size = UDim2.new(d, 0, 1, 0)
-	local color = Color3.fromRGB(r * d, g * d, b * d)
-	previewBox.BackgroundColor3 = color
-	return color
-end
-
-local function bindBar(barBg, box, isDark)
-	barBg.InputBegan:Connect(function(input)
-		if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
-		local conn
-		local function update(pos)
-			local rel = math.clamp((pos.X - barBg.AbsolutePosition.X) / barBg.AbsoluteSize.X, 0, 1)
-			if isDark then
-				box.Text = tostring(math.floor(rel * 100 + 0.5))
-			else
-				box.Text = tostring(math.floor(rel * 255 + 0.5))
-			end
-			getPickerColor()
-		end
-		update(input.Position)
-		conn = UserInputService.InputChanged:Connect(function(inp)
-			if inp.UserInputType == Enum.UserInputType.MouseMovement or inp.UserInputType == Enum.UserInputType.Touch then
-				update(inp.Position)
-			end
-		end)
-		local endConn
-		endConn = UserInputService.InputEnded:Connect(function(inp)
-			if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
-				if conn then conn:Disconnect() end
-				if endConn then endConn:Disconnect() end
-			end
-		end)
-	end)
-	box.FocusLost:Connect(function()
-		getPickerColor()
-	end)
-end
-
-bindBar(rBar, rBox, false)
-bindBar(gBar, gBox, false)
-bindBar(bBar, bBox, false)
-bindBar(dBar, dBox, true)
-
-local function setTarget(t)
-	applyTarget = t
-	tAccent.BackgroundColor3 = (t == "accent") and COL_ACCENT or COL_BTN
-	tButtons.BackgroundColor3 = (t == "buttons") and COL_ACCENT or COL_BTN
-	tFrame.BackgroundColor3 = (t == "frame") and COL_ACCENT or COL_BTN
-	tAccent.TextColor3 = Color3.fromRGB(255, 255, 255)
-	tButtons.TextColor3 = Color3.fromRGB(255, 255, 255)
-	tFrame.TextColor3 = Color3.fromRGB(255, 255, 255)
-end
-
-tAccent.MouseButton1Click:Connect(function() setTarget("accent") end)
-tButtons.MouseButton1Click:Connect(function() setTarget("buttons") end)
-tFrame.MouseButton1Click:Connect(function() setTarget("frame") end)
-
-openPickerBtn.MouseButton1Click:Connect(function()
-	pickerFrame.Visible = true
-	getPickerColor()
-end)
-pickerClose.MouseButton1Click:Connect(function()
-	pickerFrame.Visible = false
-end)
-
--- Visual
-local visualLabel = Instance.new("TextLabel")
-visualLabel.Size = UDim2.new(1, 0, 0, 20)
-visualLabel.BackgroundTransparency = 1
-visualLabel.Text = "— Visual —"
-visualLabel.TextColor3 = Color3.fromRGB(140, 140, 170)
-visualLabel.TextSize = 11
-visualLabel.Font = Enum.Font.GothamBold
-visualLabel.LayoutOrder = 10
-visualLabel.Parent = otherPage
-
-local winsBox, winsEnter, winsReset = createVisualRow(otherPage, "Wins", 11)
-
-local saveWinsBtn = Instance.new("TextButton")
-saveWinsBtn.Name = "SaveWinsForReset"
-saveWinsBtn.Size = UDim2.new(1, 0, 0, 30)
-saveWinsBtn.BackgroundColor3 = COL_ACCENT
-saveWinsBtn.BorderSizePixel = 0
-saveWinsBtn.Text = "Save Wins for Reset"
-saveWinsBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-saveWinsBtn.TextSize = 11
-saveWinsBtn.Font = Enum.Font.GothamBold
-saveWinsBtn.AutoButtonColor = false
-saveWinsBtn.LayoutOrder = 14
-saveWinsBtn.Parent = otherPage
-
-local saveWinsCorner = Instance.new("UICorner")
-saveWinsCorner.CornerRadius = UDim.new(0, 7)
-saveWinsCorner.Parent = saveWinsBtn
-
--- Visual Enter / Reset / Save
-winsEnter.MouseButton1Click:Connect(function()
-	local num = tonumber(winsBox.Text)
-	if not num then warn("[MonkeyGUI] Ungültige Wins-Zahl") return end
-	if winsMantissa then
-		winsMantissa.Value = num -- 1 = 1
-		print("[MonkeyGUI] Wins.Mantissa =", num)
-	else
-		warn("[MonkeyGUI] Wins.Mantissa nicht gefunden")
-	end
-end)
-
-winsReset.MouseButton1Click:Connect(function()
-	winsBox.Text = ""
-	if winsMantissa and savedWinsValue ~= nil then
-		winsMantissa.Value = savedWinsValue
-		print("[MonkeyGUI] Wins Reset → gespeicherter Wert:", savedWinsValue)
-	else
-		warn("[MonkeyGUI] Kein gespeicherter Wins-Wert – zuerst Save Wins for Reset drücken")
-	end
-end)
-
-saveWinsBtn.MouseButton1Click:Connect(function()
-	if not winsMantissa then
-		warn("[MonkeyGUI] Wins.Mantissa nicht gefunden")
-		return
-	end
-	savedWinsValue = winsMantissa.Value
-	saveWinsBtn.Text = "Saved!"
-	print("[MonkeyGUI] Wins für Reset gespeichert:", savedWinsValue)
-	task.delay(1.2, function()
-		if saveWinsBtn and saveWinsBtn.Parent then
-			saveWinsBtn.Text = "Save Wins for Reset"
-		end
-	end)
-end)
-
-local resizeHandle = Instance.new("TextButton")
-resizeHandle.Size = UDim2.new(0, 14, 0, 14)
-resizeHandle.Position = UDim2.new(1, -16, 1, -16)
-resizeHandle.BackgroundColor3 = Color3.fromRGB(70, 70, 95)
-resizeHandle.BorderSizePixel = 0
-resizeHandle.Text = ""
-resizeHandle.AutoButtonColor = false
-resizeHandle.Parent = mainFrame
-
-local resizeCorner = Instance.new("UICorner")
-resizeCorner.CornerRadius = UDim.new(0, 3)
-resizeCorner.Parent = resizeHandle
-
-local confirmFrame = Instance.new("Frame")
-confirmFrame.Size = UDim2.new(0, 240, 0, 130)
-confirmFrame.Position = UDim2.new(0.5, -120, 0.5, -65)
-confirmFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
-confirmFrame.BorderSizePixel = 0
-confirmFrame.Visible = false
-confirmFrame.ZIndex = 20
-confirmFrame.Parent = screenGui
-
-local confirmCorner = Instance.new("UICorner")
-confirmCorner.CornerRadius = UDim.new(0, 10)
-confirmCorner.Parent = confirmFrame
-
-local confirmStroke = Instance.new("UIStroke")
-confirmStroke.Color = Color3.fromRGB(90, 90, 120)
-confirmStroke.Thickness = 1.2
-confirmStroke.Parent = confirmFrame
-
-local confirmTitle = Instance.new("TextLabel")
-confirmTitle.Size = UDim2.new(1, -16, 0, 26)
-confirmTitle.Position = UDim2.new(0, 8, 0, 12)
-confirmTitle.BackgroundTransparency = 1
-confirmTitle.Text = "Panel schließen?"
-confirmTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-confirmTitle.TextSize = 15
-confirmTitle.Font = Enum.Font.GothamBold
-confirmTitle.Parent = confirmFrame
-
-local confirmText = Instance.new("TextLabel")
-confirmText.Size = UDim2.new(1, -16, 0, 24)
-confirmText.Position = UDim2.new(0, 8, 0, 40)
-confirmText.BackgroundTransparency = 1
-confirmText.Text = "Wirklich schließen?"
-confirmText.TextColor3 = Color3.fromRGB(170, 170, 190)
-confirmText.TextSize = 12
-confirmText.Font = Enum.Font.Gotham
-confirmText.Parent = confirmFrame
-
-local yesButton = Instance.new("TextButton")
-yesButton.Size = UDim2.new(0, 95, 0, 32)
-yesButton.Position = UDim2.new(0, 16, 1, -46)
-yesButton.BackgroundColor3 = Color3.fromRGB(190, 55, 65)
-yesButton.BorderSizePixel = 0
-yesButton.Text = "Ja"
-yesButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-yesButton.TextSize = 13
-yesButton.Font = Enum.Font.GothamBold
-yesButton.AutoButtonColor = false
-yesButton.Parent = confirmFrame
-
-local yesCorner = Instance.new("UICorner")
-yesCorner.CornerRadius = UDim.new(0, 7)
-yesCorner.Parent = yesButton
-
-local noButton = Instance.new("TextButton")
-noButton.Size = UDim2.new(0, 95, 0, 32)
-noButton.Position = UDim2.new(1, -111, 1, -46)
-noButton.BackgroundColor3 = Color3.fromRGB(45, 45, 60)
-noButton.BorderSizePixel = 0
-noButton.Text = "Nein"
-noButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-noButton.TextSize = 13
-noButton.Font = Enum.Font.GothamBold
-noButton.AutoButtonColor = false
-noButton.Parent = confirmFrame
-
-local noCorner = Instance.new("UICorner")
-noCorner.CornerRadius = UDim.new(0, 7)
-noCorner.Parent = noButton
-
--- ====================== INTRO ======================
-local function showMainPanel()
-	pcall(function()
-		if introFrame and introFrame.Parent then
-			introFrame:Destroy()
-		end
-	end)
-	mainFrame.Visible = true
-	mainFrame.Size = UDim2.new(0, PANEL_W, 0, PANEL_H)
-	mainFrame.BackgroundTransparency = 0
-	mainStroke.Transparency = 0.3
-	glow.ImageTransparency = 0.88
-	pcall(function() switchTab("Farm VIP") end)
-	print("[MonkeyGUI] Panel sichtbar")
-end
-
-task.spawn(function()
-	local ok, err = pcall(function()
-		local fadeIn = TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-		TweenService:Create(introTitle, fadeIn, {TextTransparency = 0}):Play()
-		TweenService:Create(creatorText, fadeIn, {TextTransparency = 0}):Play()
-		TweenService:Create(versionText, fadeIn, {TextTransparency = 0}):Play()
-		TweenService:Create(statusText, fadeIn, {TextTransparency = 0}):Play()
-		TweenService:Create(percentText, fadeIn, {TextTransparency = 0}):Play()
-		TweenService:Create(barBackground, fadeIn, {BackgroundTransparency = 0}):Play()
-		pcall(function()
-			TweenService:Create(titleGlow, fadeIn, {ImageTransparency = 0.55}):Play()
-		end)
-		task.wait(0.3)
-
-		local loadingSteps = {
-			{text = "Loading...", progress = 0.3},
-			{text = "Loading UI...", progress = 0.6},
-			{text = "Ready!", progress = 1.0},
-		}
-		for _, step in ipairs(loadingSteps) do
-			statusText.Text = step.text
-			percentText.Text = math.floor(step.progress * 100) .. "%"
-			barFill.Size = UDim2.new(step.progress, 0, 1, 0)
-			task.wait(0.35)
-		end
-		task.wait(0.2)
-	end)
-
-	if not ok then
-		warn("[MonkeyGUI] Intro Fehler:", err)
-	end
-	showMainPanel()
-end)
-
--- Fallback: falls Intro hängt, Panel nach 6s trotzdem zeigen
-task.delay(6, function()
-	if mainFrame and mainFrame.Parent and not mainFrame.Visible then
-		warn("[MonkeyGUI] Intro Timeout – zeige Panel")
-		showMainPanel()
-	end
-end)
-
--- ====================== DRAG / RESIZE ======================
-local dragging, dragStart, startPos = false
-titleBar.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-		dragging = true
-		dragStart = input.Position
-		startPos = mainFrame.Position
-		input.Changed:Connect(function()
-			if input.UserInputState == Enum.UserInputState.End then dragging = false end
-		end)
-	end
-end)
-UserInputService.InputChanged:Connect(function(input)
-	if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-		local delta = input.Position - dragStart
-		mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-	end
-end)
-
-local resizing, resizeStart, startSize = false
-resizeHandle.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-		resizing = true
-		resizeStart = input.Position
-		startSize = mainFrame.Size
-		input.Changed:Connect(function()
-			if input.UserInputState == Enum.UserInputState.End then resizing = false end
-		end)
-	end
-end)
-UserInputService.InputChanged:Connect(function(input)
-	if resizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-		local delta = input.Position - resizeStart
-		mainFrame.Size = UDim2.new(0, math.clamp(startSize.X.Offset + delta.X, MIN_W, MAX_W), 0, math.clamp(startSize.Y.Offset + delta.Y, MIN_H, MAX_H))
-	end
-end)
-
--- ====================== HELPER ======================
-local function setButtonState(btn, stroke, isOn, onText, offText)
-	if isOn then
-		btn.Text = onText
-		TweenService:Create(btn, TweenInfo.new(0.2), {
-			BackgroundColor3 = COL_ON,
-			BackgroundTransparency = 0
-		}):Play()
-		TweenService:Create(stroke, TweenInfo.new(0.2), {
-			Color = Color3.fromRGB(80, 220, 140),
-			Transparency = 0.2
-		}):Play()
-	else
-		btn.Text = offText
-		TweenService:Create(btn, TweenInfo.new(0.2), {
-			BackgroundColor3 = COL_BTN,
-			BackgroundTransparency = 0
-		}):Play()
-		TweenService:Create(stroke, TweenInfo.new(0.2), {
-			Color = COL_STROKE,
-			Transparency = 0.35
-		}):Play()
-	end
-end
-
-local function setPartInvisible(part, storage)
-	if not part then return end
-	local function apply(obj)
-		if obj:IsA("BasePart") then
-			if not storage[obj] then
-				storage[obj] = {CanCollide = obj.CanCollide, Transparency = obj.Transparency}
-			end
-			obj.CanCollide = false
-			obj.Transparency = 1
-		end
-	end
-	if part:IsA("BasePart") then apply(part)
-	elseif part:IsA("Model") then
-		for _, d in ipairs(part:GetDescendants()) do apply(d) end
-	end
-end
-
-local function restorePart(part, storage)
-	if not part then return end
-	local function restore(obj)
-		if obj:IsA("BasePart") and storage[obj] then
-			obj.CanCollide = storage[obj].CanCollide
-			obj.Transparency = storage[obj].Transparency
-			storage[obj] = nil
-		end
-	end
-	if part:IsA("BasePart") then restore(part)
-	elseif part:IsA("Model") then
-		for _, d in ipairs(part:GetDescendants()) do restore(d) end
-	end
-end
-
-local function getKeyName(keyCode)
-	return tostring(keyCode):gsub("Enum.KeyCode.", "")
-end
-
-local function updateKeybindLabel()
-	if isRebinding then
-		keybindButton.Text = "Taste drücken..."
-		keybindButton.BackgroundColor3 = Color3.fromRGB(100, 70, 40)
-	else
-		keybindButton.Text = "Keybind: [" .. getKeyName(speedKeyCode) .. "]"
-		keybindButton.BackgroundColor3 = Color3.fromRGB(45, 45, 60)
-	end
-end
-
--- ====================== SPEED BOOST ======================
-local speedOn = false
-local speedLoopThread = nil
-
-local function toggleSpeed()
-	if not levelValue or not leaderLevel then return end
-	speedOn = not speedOn
-	setButtonState(speedButton, speedStroke, speedOn, "Speed Boost: AN", "Speed Boost: AUS")
-
-	if speedOn then
-		speedLoopThread = task.spawn(function()
-			while speedOn do
-				if levelValue then
-					levelValue.Value = 1000
-				end
-				task.wait(0)
-			end
-		end)
-	else
-		if speedLoopThread then
-			task.cancel(speedLoopThread)
-			speedLoopThread = nil
-		end
-		if levelValue and leaderLevel then
-			levelValue.Value = leaderLevel.Value
-		end
-	end
-end
-speedButton.MouseButton1Click:Connect(toggleSpeed)
-keybindButton.MouseButton1Click:Connect(function()
-	if isRebinding then return end
-	isRebinding = true
-	updateKeybindLabel()
-end)
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-	if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
-	if isRebinding then
-		if input.KeyCode == Enum.KeyCode.Escape then
-			isRebinding = false
-			updateKeybindLabel()
-			return
-		end
-		speedKeyCode = input.KeyCode
-		isRebinding = false
-		updateKeybindLabel()
-		return
-	end
-	if gameProcessed then return end
-	if input.KeyCode == speedKeyCode then toggleSpeed() end
-end)
-
--- ====================== SPEED FARM ======================
-local speedFarmOn = false
-local speedFarmThread = nil
-
-local function getCharacterParts()
-	local char = player.Character
-	if not char then return nil end
-	local humanoid = char:FindFirstChildOfClass("Humanoid")
-	local hrp = char:FindFirstChild("HumanoidRootPart")
-	if humanoid and hrp and humanoid.Health > 0 then
-		return char, humanoid, hrp
-	end
-	return nil
-end
-
-local function doForwardStep()
-	local char, humanoid, hrp = getCharacterParts()
-	if not char then return end
-	local look = hrp.CFrame.LookVector
-	local flatLook = Vector3.new(look.X, 0, look.Z)
-	if flatLook.Magnitude < 0.05 then return end
-	flatLook = flatLook.Unit
-	humanoid:Move(flatLook) -- 0 Studs Fortbewegung
-	task.wait(FORWARD_TIME)
-	humanoid:Move(Vector3.zero)
-end
-
-local function toggleSpeedFarm()
-	speedFarmOn = not speedFarmOn
-	setButtonState(speedFarmBtn, speedFarmStroke, speedFarmOn, "Speed Farm: AN", "Speed Farm: AUS")
-	if speedFarmOn then
-		speedFarmThread = task.spawn(function()
-			while speedFarmOn do
-				doForwardStep()
-				if not speedFarmOn then break end
-				task.wait(STAND_TIME)
-			end
-		end)
-	else
-		if speedFarmThread then
-			task.cancel(speedFarmThread)
-			speedFarmThread = nil
-		end
-		local _, humanoid = getCharacterParts()
-		if humanoid then humanoid:Move(Vector3.zero) end
-	end
-end
-speedFarmBtn.MouseButton1Click:Connect(toggleSpeedFarm)
-
--- ====================== IMMORTAL ======================
-local immortalOn = false
-local savedRemotes = {}
-
-local function toggleImmortal()
-	immortalOn = not immortalOn
-	setButtonState(immortalBtn, immortalStroke, immortalOn, "Immortal: AN", "Immortal: AUS")
-	local remotesFolder = ReplicatedStorage:FindFirstChild("Remotes")
-	if not remotesFolder then
-		warn("[MonkeyGUI] Remotes Ordner nicht gefunden")
-		return
-	end
-	if immortalOn then
-		for _, name in ipairs({"Died", "PlayerDied"}) do
-			local remote = remotesFolder:FindFirstChild(name)
-			if remote then
-				savedRemotes[name] = {instance = remote, parent = remotesFolder}
-				remote.Parent = nil
-				print("[MonkeyGUI] Entfernt:", name)
-			end
-		end
-	else
-		for name, data in pairs(savedRemotes) do
-			if data.instance and data.parent then
-				data.instance.Parent = data.parent
-				print("[MonkeyGUI] Wiederhergestellt:", name)
-			end
-		end
-		savedRemotes = {}
-	end
-end
-immortalBtn.MouseButton1Click:Connect(toggleImmortal)
-
--- ====================== WORLD SYSTEM ======================
-local function createWorldToggle(config)
-	local state = {on = false, connection = nil, part = nil, original = {}}
-	local function getPart()
-		local map = workspace:FindFirstChild("Map")
-		if not map then return nil end
-		local world = map:FindFirstChild(config.worldName)
-		if not world then return nil end
-		local stages = world:FindFirstChild("Stages")
-		if not stages then return nil end
-		local stage = stages:FindFirstChild(config.stageName)
-		if not stage then return nil end
-		local container = stage
-		if config.useFinalDestination then
-			container = stage:FindFirstChild("FinalDestination")
-			if not container then return nil end
-		end
-		local winFolder = container:FindFirstChild(config.winName)
-		if not winFolder then return nil end
-		return winFolder:FindFirstChild("Button")
-	end
-	local function toggle()
-		state.on = not state.on
-		setButtonState(config.button, config.stroke, state.on, config.name .. ": AN", config.name .. ": AUS")
-		if state.on then
-			local character = player.Character
-			if character then
-				local hrp = character:FindFirstChild("HumanoidRootPart")
-				if hrp then hrp.CFrame = CFrame.new(config.position) end
-			end
-			state.part = getPart()
-			setPartInvisible(state.part, state.original)
-			state.connection = RunService.Heartbeat:Connect(function()
-				local character = player.Character
-				if not character then return end
-				local hrp = character:FindFirstChild("HumanoidRootPart")
-				if not hrp then return end
-				local part = getPart()
-				if part then
-					state.part = part
-					setPartInvisible(part, state.original)
-					if part:IsA("Model") then part:PivotTo(hrp.CFrame) else part.CFrame = hrp.CFrame end
-				end
-			end)
-		else
-			if state.connection then state.connection:Disconnect() state.connection = nil end
-			restorePart(state.part or getPart(), state.original)
-			state.part = nil
-		end
-	end
-	config.button.MouseButton1Click:Connect(toggle)
-	return state
-end
-
-local vipStates = {
-	createWorldToggle({name="World 5", button=vipW5Btn, stroke=vipW5Stroke, worldName="World5", stageName="Stage3", winName="VipWin", position=TELEPORT_POSITION_WORLD5, useFinalDestination=false}),
-	createWorldToggle({name="World 4", button=vipW4Btn, stroke=vipW4Stroke, worldName="World4", stageName="Stage9", winName="VipWin", position=TELEPORT_POSITION_WORLD4, useFinalDestination=false}),
-	createWorldToggle({name="World 3", button=vipW3Btn, stroke=vipW3Stroke, worldName="World3", stageName="Stage7", winName="VipWin", position=TELEPORT_POSITION_WORLD3, useFinalDestination=false}),
-	createWorldToggle({name="World 2", button=vipW2Btn, stroke=vipW2Stroke, worldName="World2", stageName="Stage9", winName="VipWin", position=TELEPORT_POSITION_WORLD2, useFinalDestination=true}),
-	createWorldToggle({name="World 1", button=vipW1Btn, stroke=vipW1Stroke, worldName="World1", stageName="Stage9", winName="VipWin", position=TELEPORT_POSITION_WORLD1, useFinalDestination=false}),
-}
-
-local normalStates = {
-	createWorldToggle({name="World 5", button=norW5Btn, stroke=norW5Stroke, worldName="World5", stageName="Stage3", winName="NormalWin", position=TELEPORT_POSITION_WORLD5, useFinalDestination=false}),
-	createWorldToggle({name="World 4", button=norW4Btn, stroke=norW4Stroke, worldName="World4", stageName="Stage9", winName="NormalWin", position=TELEPORT_POSITION_WORLD4, useFinalDestination=false}),
-	createWorldToggle({name="World 3", button=norW3Btn, stroke=norW3Stroke, worldName="World3", stageName="Stage7", winName="NormalWin", position=TELEPORT_POSITION_WORLD3, useFinalDestination=false}),
-	createWorldToggle({name="World 2", button=norW2Btn, stroke=norW2Stroke, worldName="World2", stageName="Stage9", winName="NormalWin", position=TELEPORT_POSITION_WORLD2, useFinalDestination=true}),
-	createWorldToggle({name="World 1", button=norW1Btn, stroke=norW1Stroke, worldName="World1", stageName="Stage9", winName="NormalWin", position=TELEPORT_POSITION_WORLD1, useFinalDestination=false}),
-}
-
--- ====================== CLOSE ======================
-local isMinimized = false
-local originalSize = UDim2.new(0, PANEL_W, 0, PANEL_H)
-
-minimizeButton.MouseButton1Click:Connect(function()
-	isMinimized = not isMinimized
-	local info = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-	if isMinimized then
-		originalSize = mainFrame.Size
-		TweenService:Create(mainFrame, info, {Size = UDim2.new(0, mainFrame.Size.X.Offset, 0, TITLE_H)}):Play()
-		body.Visible = false
-		resizeHandle.Visible = false
-		minimizeButton.Text = "+"
-	else
-		TweenService:Create(mainFrame, info, {Size = originalSize}):Play()
-		task.delay(0.12, function()
-			body.Visible = true
-			resizeHandle.Visible = true
-		end)
-		minimizeButton.Text = "−"
-	end
-end)
-
--- Generischer Confirm-Dialog
-local confirmCallback = nil
-
-local function openConfirm(title, text, onYes)
-	confirmTitle.Text = title or "Bestätigen?"
-	confirmText.Text = text or "Bist du sicher?"
-	confirmCallback = onYes
-	confirmFrame.Visible = true
-	confirmFrame.Size = UDim2.new(0, 0, 0, 0)
-	confirmFrame.BackgroundTransparency = 1
-	TweenService:Create(confirmFrame, TweenInfo.new(0.25, Enum.EasingStyle.Back), {
-		Size = UDim2.new(0, 240, 0, 130),
-		BackgroundTransparency = 0
-	}):Play()
-end
-
-local function hideConfirm()
-	TweenService:Create(confirmFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-		Size = UDim2.new(0, 0, 0, 0),
-		BackgroundTransparency = 1
-	}):Play()
-	task.delay(0.22, function()
-		confirmFrame.Visible = false
-		confirmCallback = nil
-	end)
-end
-
-local function doCloseGui()
-	speedOn = false
-	if speedLoopThread then task.cancel(speedLoopThread) speedLoopThread = nil end
-	if levelValue and leaderLevel then levelValue.Value = leaderLevel.Value end
-	speedFarmOn = false
-	if speedFarmThread then task.cancel(speedFarmThread) speedFarmThread = nil end
-	local _, humanoid = getCharacterParts()
-	if humanoid then humanoid:Move(Vector3.zero) end
-	if immortalOn then
-		for name, data in pairs(savedRemotes) do
-			if data.instance and data.parent then data.instance.Parent = data.parent end
-		end
-		savedRemotes = {}
-		immortalOn = false
-	end
-	for _, state in pairs(vipStates) do
-		if state.connection then state.connection:Disconnect() end
-		restorePart(state.part, state.original)
-	end
-	for _, state in pairs(normalStates) do
-		if state.connection then state.connection:Disconnect() end
-		restorePart(state.part, state.original)
-	end
-	local closeInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-	TweenService:Create(mainFrame, closeInfo, {Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1}):Play()
-	TweenService:Create(confirmFrame, closeInfo, {Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1}):Play()
-	task.delay(0.28, function() screenGui:Destroy() end)
-end
-
-closeButton.MouseButton1Click:Connect(function()
-	openConfirm("Panel schließen?", "Möchtest du das Panel wirklich schließen?", doCloseGui)
-end)
-
-yesButton.MouseButton1Click:Connect(function()
-	local cb = confirmCallback
-	hideConfirm()
-	if cb then
-		task.defer(cb)
-	end
-end)
-
-noButton.MouseButton1Click:Connect(function()
-	hideConfirm()
-end)
-
-local function setupHover(btn, isOnFunc)
-	btn.MouseEnter:Connect(function()
-		if not isOnFunc() then
-			TweenService:Create(btn, TweenInfo.new(0.15), {
-				BackgroundColor3 = COL_BTN_HOVER,
-				BackgroundTransparency = 0
-			}):Play()
-		end
-	end)
-	btn.MouseLeave:Connect(function()
-		if not isOnFunc() then
-			TweenService:Create(btn, TweenInfo.new(0.15), {
-				BackgroundColor3 = COL_BTN,
-				BackgroundTransparency = 0
-			}):Play()
-		end
-	end)
-end
-
-setupHover(vipW5Btn, function() return vipStates[1].on end)
-setupHover(vipW4Btn, function() return vipStates[2].on end)
-setupHover(vipW3Btn, function() return vipStates[3].on end)
-setupHover(vipW2Btn, function() return vipStates[4].on end)
-setupHover(vipW1Btn, function() return vipStates[5].on end)
-setupHover(norW5Btn, function() return normalStates[1].on end)
-setupHover(norW4Btn, function() return normalStates[2].on end)
-setupHover(norW3Btn, function() return normalStates[3].on end)
-setupHover(norW2Btn, function() return normalStates[4].on end)
-setupHover(norW1Btn, function() return normalStates[5].on end)
-setupHover(speedButton, function() return speedOn end)
-setupHover(speedFarmBtn, function() return speedFarmOn end)
-setupHover(immortalBtn, function() return immortalOn end)
-setupHover(speedRunBtn, function() return speedRunOn end)
-
-minimizeButton.MouseEnter:Connect(function()
-	TweenService:Create(minimizeButton, TweenInfo.new(0.12), {BackgroundColor3 = COL_BTN_HOVER}):Play()
-end)
-minimizeButton.MouseLeave:Connect(function()
-	TweenService:Create(minimizeButton, TweenInfo.new(0.12), {BackgroundColor3 = COL_BTN}):Play()
-end)
-closeButton.MouseEnter:Connect(function()
-	TweenService:Create(closeButton, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(230, 70, 80)}):Play()
-end)
-closeButton.MouseLeave:Connect(function()
-	TweenService:Create(closeButton, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(190, 55, 65)}):Play()
-end)
-
--- ====================== SPEED RUN LOGIC (alte Version + Reset Confirm) ======================
-local timerRunning = false
-local timerStart = 0
-local currentWorld = nil
-local speedRunConnections = {}
-local endPartsFolder = nil
-local records = {nil, nil, nil, nil, nil}
-
-local END_PART_DATA = {
-	{name = "World1End", pos = Vector3.new(-9399.837890625, 808.3340454101562, -217.40939331054688), size = Vector3.new(2, 919, 520)},
-	{name = "World2End", pos = Vector3.new(-3619.22705078125, 209.0904541015625, -9341.31640625), size = Vector3.new(411, 120, 2)},
-	{name = "World3End", pos = Vector3.new(-8063.50927734375, 332.2464294433594, 2770.147705078125), size = Vector3.new(4, 110, 235)},
-	{name = "World4End", pos = Vector3.new(-7708.83203125, 77.25337982177734, 5769.6376953125), size = Vector3.new(1, 124, 512)},
-	{name = "World5End", pos = Vector3.new(-1324.158203125, 111.29043579101562, 7608.85888671875), size = Vector3.new(4, 181, 260)},
-}
-
-local function formatTime(t)
-	return string.format("%.2f", t)
-end
-
-local function updateRecordLabels()
-	for i = 1, 5 do
+local srStatus = Instance.new("TextLabel")
+srStatus.Size = UDim2.new(1,0,0,18)
+srStatus.BackgroundTransparency = 1
+srStatus.Text = "Status: Aus"
+srStatus.TextColor3 = CFG.COL_MUTED
+srStatus.TextSize = 11
+srStatus.Font = Enum.Font.Gotham
+srStatus.LayoutOrder = 2
+srStatus.Parent = speedRunPage
+
+local recordsTitle = Instance.new("TextLabel")
+recordsTitle.Size = UDim2.new(1,0,0,18)
+recordsTitle.BackgroundTransparency = 1
+recordsTitle.Text = "- Rekorde -"
+recordsTitle.TextColor3 = CFG.COL_MUTED
+recordsTitle.TextSize = 11
+recordsTitle.Font = Enum.Font.GothamBold
+recordsTitle.LayoutOrder = 3
+recordsTitle.Parent = speedRunPage
+
+local records = {nil,nil,nil,nil,nil}
+local recordLabels = {}
+local srConns = {}
+local endFolder = nil
+local function fmt(t) return string.format("%.2f", t) end
+local function updateRecords()
+	for i=1,5 do
 		if records[i] then
-			recordLabels[i].Text = "World " .. i .. ":  " .. formatTime(records[i]) .. "s"
-			recordLabels[i].TextColor3 = Color3.fromRGB(120, 255, 160)
+			recordLabels[i].Text = "World "..i..":  "..fmt(records[i]).."s"
+			recordLabels[i].TextColor3 = Color3.fromRGB(120,255,160)
 		else
-			recordLabels[i].Text = "World " .. i .. ":  --.--"
-			recordLabels[i].TextColor3 = COL_TEXT
+			recordLabels[i].Text = "World "..i..":  --.--"
+			recordLabels[i].TextColor3 = CFG.COL_TEXT
 		end
 	end
 end
 
-local function setTimerDisplay(t)
-	timerOverlay.Text = formatTime(t)
+for i=1,5 do
+	local row = Instance.new("Frame")
+	row.Size = UDim2.new(1,0,0,26)
+	row.BackgroundTransparency = 1
+	row.LayoutOrder = 3+i
+	row.Parent = speedRunPage
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.new(1,-52,1,0)
+	lbl.BackgroundColor3 = CFG.COL_BTN
+	lbl.BorderSizePixel = 0
+	lbl.Text = "World "..i..":  --.--"
+	lbl.TextColor3 = CFG.COL_TEXT
+	lbl.TextSize = 12
+	lbl.Font = Enum.Font.Gotham
+	lbl.Parent = row
+	corner(lbl, 6)
+	recordLabels[i] = lbl
+	local rb = Instance.new("TextButton")
+	rb.Size = UDim2.new(0,48,1,0)
+	rb.Position = UDim2.new(1,-48,0,0)
+	rb.BackgroundColor3 = Color3.fromRGB(160,55,65)
+	rb.BorderSizePixel = 0
+	rb.Text = "Reset"
+	rb.TextColor3 = Color3.new(1,1,1)
+	rb.TextSize = 10
+	rb.Font = Enum.Font.GothamBold
+	rb.AutoButtonColor = false
+	rb.Parent = row
+	corner(rb, 6)
+	local wi = i
+	rb.MouseButton1Click:Connect(function() records[wi]=nil; updateRecords() end)
 end
 
-local function stopTimer(finished)
-	timerRunning = false
-	if finished and currentWorld and timerStart > 0 then
-		local elapsed = tick() - timerStart
-		setTimerDisplay(elapsed)
-		if not records[currentWorld] or elapsed < records[currentWorld] then
-			records[currentWorld] = elapsed
-			updateRecordLabels()
-			timerStatusLabel.Text = "Status: Rekord! World " .. currentWorld
-			timerStatusLabel.TextColor3 = Color3.fromRGB(120, 255, 160)
-		else
-			timerStatusLabel.Text = "Status: Fertig World " .. currentWorld
-			timerStatusLabel.TextColor3 = COL_MUTED
-		end
+local function clearSR()
+	for _,c in ipairs(srConns) do pcall(function() c:Disconnect() end) end
+	srConns = {}
+	if endFolder then
+		pcall(function() endFolder:Destroy() end)
+		endFolder = nil
 	end
 end
 
-local function resetTimerIdle()
-	timerRunning = false
-	timerStart = 0
-	currentWorld = nil
-	setTimerDisplay(0)
-	timerStatusLabel.Text = "Status: Bereit (Start berühren)"
-	timerStatusLabel.TextColor3 = COL_MUTED
-end
-
-local function startTimer(worldIndex)
-	if not speedRunOn then return end
-	if timerRunning then return end
-	currentWorld = worldIndex
-	timerStart = tick()
-	timerRunning = true
-	timerStatusLabel.Text = "Status: Läuft – World " .. worldIndex
-	timerStatusLabel.TextColor3 = Color3.fromRGB(255, 200, 80)
-end
-
-local function isPlayerTouch(hit)
-	if not hit then return false end
+local function isTouch(hit)
 	local char = player.Character
-	if not char then return false end
-	return hit:IsDescendantOf(char)
+	return char and hit and hit:IsDescendantOf(char)
 end
 
-local function connectTouchesOn(obj, callback)
+local function hookTouch(obj, cb)
 	if not obj then return end
-	local function hook(part)
-		if part:IsA("BasePart") then
-			table.insert(speedRunConnections, part.Touched:Connect(function(hit)
-				if isPlayerTouch(hit) then
-					callback()
-				end
+	local function hook(p)
+		if p:IsA("BasePart") then
+			table.insert(srConns, p.Touched:Connect(function(hit)
+				if isTouch(hit) then cb() end
 			end))
 		end
 	end
-	if obj:IsA("BasePart") then
-		hook(obj)
-	else
-		for _, d in ipairs(obj:GetDescendants()) do
-			hook(d)
-		end
-		for _, c in ipairs(obj:GetChildren()) do
-			hook(c)
-		end
-	end
+	if obj:IsA("BasePart") then hook(obj)
+	else for _,d in ipairs(obj:GetDescendants()) do hook(d) end end
 end
 
-local function createEndParts()
-	if endPartsFolder and endPartsFolder.Parent then
-		endPartsFolder:Destroy()
-	end
-	endPartsFolder = Instance.new("Folder")
-	endPartsFolder.Name = "MonkeyGUI_SpeedRunEnds"
-	endPartsFolder.Parent = workspace
-
-	for i, data in ipairs(END_PART_DATA) do
+local function setupSR()
+	clearSR()
+	endFolder = Instance.new("Folder")
+	endFolder.Name = "MonkeyGUI_SpeedRunEnds"
+	endFolder.Parent = workspace
+	for i,d in ipairs(CFG.ENDS) do
 		local p = Instance.new("Part")
-		p.Name = data.name
-		p.Anchored = true
-		p.CanCollide = false
-		p.Transparency = 1
-		p.Size = data.size
-		p.Position = data.pos
-		p.Parent = endPartsFolder
-		connectTouchesOn(p, function()
-			if not speedRunOn or not timerRunning then return end
-			if currentWorld ~= i then return end
-			stopTimer(true)
+		p.Name = d.n; p.Anchored = true; p.CanCollide = false; p.Transparency = 1
+		p.Size = d.s; p.Position = d.p; p.Parent = endFolder
+		local wi = i
+		hookTouch(p, function()
+			if not State.speedRunOn or not State.timerRunning then return end
+			if State.currentWorld ~= wi then return end
+			State.timerRunning = false
+			local elapsed = tick() - State.timerStart
+			timerOverlay.Text = fmt(elapsed)
+			if not records[wi] or elapsed < records[wi] then
+				records[wi] = elapsed; updateRecords()
+				srStatus.Text = "Status: Rekord! World "..wi
+			else
+				srStatus.Text = "Status: Fertig World "..wi
+			end
 		end)
 	end
-end
-
-local function connectStartWalls()
 	local map = workspace:FindFirstChild("Map")
 	if not map then return end
-	for i = 1, 5 do
-		local world = map:FindFirstChild("World" .. i)
-		if world then
-			local stages = world:FindFirstChild("Stages")
-			local spawn = stages and stages:FindFirstChild("Spawn")
-			local wall = spawn and spawn:FindFirstChild("StageWall")
-			if wall then
-				local worldIndex = i
-				connectTouchesOn(wall, function()
-					if not speedRunOn or timerRunning then return end
-					startTimer(worldIndex)
-				end)
-			end
+	for i=1,5 do
+		local world = map:FindFirstChild("World"..i)
+		local stages = world and world:FindFirstChild("Stages")
+		local spawn = stages and stages:FindFirstChild("Spawn")
+		local wall = spawn and spawn:FindFirstChild("StageWall")
+		local wi = i
+		if wall then
+			hookTouch(wall, function()
+				if not State.speedRunOn or State.timerRunning then return end
+				State.currentWorld = wi
+				State.timerStart = tick()
+				State.timerRunning = true
+				srStatus.Text = "Status: Laeuft - World "..wi
+			end)
 		end
 	end
 end
 
-local function clearSpeedRunConnections()
-	for _, c in ipairs(speedRunConnections) do
-		pcall(function() c:Disconnect() end)
-	end
-	speedRunConnections = {}
-	if endPartsFolder then
-		pcall(function() endPartsFolder:Destroy() end)
-		endPartsFolder = nil
-	end
-end
-
--- Nur Timer-Anzeige (kein Proximity)
 RunService.RenderStepped:Connect(function()
-	if speedRunOn and timerRunning and timerStart > 0 then
-		setTimerDisplay(tick() - timerStart)
+	if State.speedRunOn and State.timerRunning and State.timerStart > 0 then
+		timerOverlay.Text = fmt(tick() - State.timerStart)
 	end
 end)
 
+local function resetTimer()
+	State.timerRunning = false; State.timerStart = 0; State.currentWorld = nil
+	timerOverlay.Text = "0.00"; srStatus.Text = "Status: Bereit (Start beruehren)"
+end
+
 local function hookDeath(char)
-	local humanoid = char:FindFirstChildOfClass("Humanoid") or char:WaitForChild("Humanoid", 5)
-	if humanoid then
-		humanoid.Died:Connect(function()
-			if speedRunOn then
-				resetTimerIdle()
-				setTimerDisplay(0)
-			end
+	local hum = char:FindFirstChildOfClass("Humanoid") or char:WaitForChild("Humanoid", 3)
+	if hum then
+		hum.Died:Connect(function()
+			if State.speedRunOn then resetTimer() end
 		end)
 	end
 end
-
 if player.Character then hookDeath(player.Character) end
 player.CharacterAdded:Connect(function(char)
 	task.wait(0.2)
 	hookDeath(char)
-	if speedRunOn then
-		resetTimerIdle()
-		setTimerDisplay(0)
+	if State.speedRunOn then resetTimer() end
+end)
+
+srBtn.MouseButton1Click:Connect(function()
+	State.speedRunOn = not State.speedRunOn
+	setToggle(srBtn, srSt, State.speedRunOn, "Speed Run: AN", "Speed Run: AUS")
+	if State.speedRunOn then
+		timerOverlay.Visible = true; resetTimer(); setupSR()
+	else
+		timerOverlay.Visible = false; clearSR(); srStatus.Text = "Status: Aus"
 	end
 end)
 
-local function toggleSpeedRun()
-	speedRunOn = not speedRunOn
-	setButtonState(speedRunBtn, speedRunStroke, speedRunOn, "Speed Run: AN", "Speed Run: AUS")
-	if speedRunOn then
-		timerOverlay.Visible = true
-		resetTimerIdle()
-		clearSpeedRunConnections()
-		createEndParts()
-		connectStartWalls()
-		print("[MonkeyGUI] Speed Run aktiv")
-	else
-		timerOverlay.Visible = false
-		timerRunning = false
-		clearSpeedRunConnections()
-		setTimerDisplay(0)
-		timerStatusLabel.Text = "Status: Aus"
-		timerStatusLabel.TextColor3 = COL_MUTED
-		print("[MonkeyGUI] Speed Run deaktiviert")
-	end
+-- Teleport hub
+for i,key in ipairs({"W1","W2","W3","W4","W5"}) do
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1,0,0,CFG.BTN_H)
+	btn.BackgroundColor3 = CFG.COL_BTN
+	btn.BorderSizePixel = 0
+	btn.Text = "Teleport World "..i
+	btn.TextColor3 = CFG.COL_TEXT
+	btn.TextSize = 12
+	btn.Font = Enum.Font.GothamBold
+	btn.AutoButtonColor = false
+	btn.LayoutOrder = i
+	btn.Parent = teleportPage
+	corner(btn, 7); stroke(btn)
+	local pos = CFG.HUB[key]
+	btn.MouseButton1Click:Connect(function() tpTo(pos) end)
 end
 
-speedRunBtn.MouseButton1Click:Connect(toggleSpeedRun)
-
--- Rekorde resetten mit Bestätigung
-for i = 1, 5 do
-	recordResetBtns[i].MouseButton1Click:Connect(function()
-		openConfirm(
-			"Rekord löschen?",
-			"World " .. i .. " Rekord wirklich löschen?",
-			function()
-				records[i] = nil
-				updateRecordLabels()
-				print("[MonkeyGUI] Rekord World " .. i .. " gelöscht")
+-- Other
+local sfBtn, sfSt = makeToggle(otherPage, "Speed Farm: AUS", 1)
+local imBtn, imSt = makeToggle(otherPage, "Immortal: AUS", 2)
+local sfThread = nil
+sfBtn.MouseButton1Click:Connect(function()
+	State.speedFarmOn = not State.speedFarmOn
+	setToggle(sfBtn, sfSt, State.speedFarmOn, "Speed Farm: AN", "Speed Farm: AUS")
+	if State.speedFarmOn then
+		sfThread = task.spawn(function()
+			while State.speedFarmOn do
+				local char = player.Character
+				local hum = char and char:FindFirstChildOfClass("Humanoid")
+				if hum then
+					hum:Move(Vector3.new(0,0,-1), true); task.wait(0.00001)
+					hum:Move(Vector3.zero); task.wait(0.00001)
+				else task.wait(0.1) end
 			end
-		)
-	end)
-end
-
-resetAllRecordsBtn.MouseButton1Click:Connect(function()
-	openConfirm(
-		"Alle Rekorde löschen?",
-		"Wirklich alle Speed-Run-Rekorde löschen?",
-		function()
-			records = {nil, nil, nil, nil, nil}
-			updateRecordLabels()
-			print("[MonkeyGUI] Alle Rekorde gelöscht")
-		end
-	)
-end)
-
--- Settings: Farben (Buttons = ALLE TextButtons im GUI außer Close & aktive ON-Toggles)
-local function applyAccentColor(color)
-	COL_ACCENT = color
-	timerOverlayStroke.Color = color
-	pcall(function() saveWinsBtn.BackgroundColor3 = color end)
-	pcall(function() discordBtn.BackgroundColor3 = color end)
-	pcall(function() openPickerBtn.BackgroundColor3 = color end)
-	if currentTab and tabs[currentTab] then
-		tabs[currentTab].button.BackgroundColor3 = color
-	end
-	rFill.BackgroundColor3 = color
-	gFill.BackgroundColor3 = color
-	bFill.BackgroundColor3 = color
-	dFill.BackgroundColor3 = color
-	if applyTarget == "accent" then
-		tAccent.BackgroundColor3 = color
-	end
-end
-
-local DEFAULT_ACCENT = Color3.fromRGB(100, 80, 220)
-local DEFAULT_BTN = Color3.fromRGB(35, 35, 48)
-local DEFAULT_BTN_HOVER = Color3.fromRGB(48, 48, 65)
-local DEFAULT_PANEL = Color3.fromRGB(18, 18, 24)
-local DEFAULT_ON = Color3.fromRGB(0, 140, 80)
-
-local function isToggleOnButton(btn)
-	local t = btn.Text or ""
-	return t:find(": AN") ~= nil
-end
-
-local function shouldSkipTheme(btn)
-	if not btn or not btn:IsA("TextButton") then return true end
-	if btn == closeButton or btn == pickerClose then return true end
-	if btn:GetAttribute("NoTheme") then return true end
-	if isToggleOnButton(btn) then return true end
-	if currentTab and tabs[currentTab] and btn == tabs[currentTab].button then return true end
-	-- Color picker interne Buttons (Ziel-Auswahl, Übernehmen)
-	if btn:IsDescendantOf(pickerFrame) then return true end
-	return false
-end
-
-local function applyBtnColor(color)
-	COL_BTN = color
-	COL_BTN_HOVER = Color3.new(
-		math.clamp(color.R * 1.25, 0, 1),
-		math.clamp(color.G * 1.25, 0, 1),
-		math.clamp(color.B * 1.25, 0, 1)
-	)
-	local function paint(btn)
-		if shouldSkipTheme(btn) then return end
-		btn.BackgroundColor3 = color
-	end
-	for _, d in ipairs(mainFrame:GetDescendants()) do
-		paint(d)
-	end
-	-- Tabs inaktiv
-	for name, data in pairs(tabs) do
-		if name ~= currentTab then
-			data.button.BackgroundColor3 = color
-		end
-	end
-end
-
-local function applyFrameColor(color)
-	COL_PANEL = color
-	mainFrame.BackgroundColor3 = color
-	local titleC = Color3.new(
-		math.clamp(color.R * 1.2, 0, 1),
-		math.clamp(color.G * 1.2, 0, 1),
-		math.clamp(color.B * 1.2, 0, 1)
-	)
-	titleBar.BackgroundColor3 = titleC
-	titleFix.BackgroundColor3 = titleC
-	sidebar.BackgroundColor3 = Color3.new(
-		math.clamp(color.R * 0.85, 0, 1),
-		math.clamp(color.G * 0.85, 0, 1),
-		math.clamp(color.B * 0.85, 0, 1)
-	)
-	pickerFrame.BackgroundColor3 = color
-	confirmFrame.BackgroundColor3 = color
-end
-
-local function resetAllColors()
-	COL_ACCENT = DEFAULT_ACCENT
-	COL_BTN = DEFAULT_BTN
-	COL_BTN_HOVER = DEFAULT_BTN_HOVER
-	COL_PANEL = DEFAULT_PANEL
-	COL_ON = DEFAULT_ON
-	applyAccentColor(DEFAULT_ACCENT)
-	applyBtnColor(DEFAULT_BTN)
-	applyFrameColor(DEFAULT_PANEL)
-	print("[MonkeyGUI] Farben zurückgesetzt")
-end
-
-for _, entry in ipairs(accentColorBtns) do
-	entry.btn.MouseButton1Click:Connect(function()
-		applyAccentColor(entry.color)
-	end)
-end
-
-for _, entry in ipairs(btnColorBtns) do
-	entry.btn.MouseButton1Click:Connect(function()
-		applyBtnColor(entry.color)
-	end)
-end
-
-for _, entry in ipairs(frameColorBtns) do
-	entry.btn.MouseButton1Click:Connect(function()
-		applyFrameColor(entry.color)
-	end)
-end
-
-applyPickerBtn.MouseButton1Click:Connect(function()
-	local color = getPickerColor()
-	if applyTarget == "accent" then
-		applyAccentColor(color)
-	elseif applyTarget == "buttons" then
-		applyBtnColor(color)
+		end)
 	else
-		applyFrameColor(color)
+		if sfThread then task.cancel(sfThread) sfThread = nil end
+		local char = player.Character
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		if hum then hum:Move(Vector3.zero) end
 	end
-	applyPickerBtn.Text = "Übernommen!"
-	task.delay(1, function()
-		if applyPickerBtn and applyPickerBtn.Parent then
-			applyPickerBtn.Text = "Übernehmen"
+end)
+
+local savedRemotes = {}
+imBtn.MouseButton1Click:Connect(function()
+	State.immortalOn = not State.immortalOn
+	setToggle(imBtn, imSt, State.immortalOn, "Immortal: AN", "Immortal: AUS")
+	local remotes = RS:FindFirstChild("Remotes")
+	if State.immortalOn then
+		if remotes then
+			for _,name in ipairs({"Died","PlayerDied"}) do
+				local r = remotes:FindFirstChild(name)
+				if r then savedRemotes[name] = {inst=r, parent=r.Parent}; r.Parent = nil end
+			end
 		end
+	else
+		for _,d in pairs(savedRemotes) do
+			if d.inst and d.parent then d.inst.Parent = d.parent end
+		end
+		savedRemotes = {}
+	end
+end)
+
+local visLabel = Instance.new("TextLabel")
+visLabel.Size = UDim2.new(1,0,0,18)
+visLabel.BackgroundTransparency = 1
+visLabel.Text = "- Visual -"
+visLabel.TextColor3 = CFG.COL_MUTED
+visLabel.TextSize = 11
+visLabel.Font = Enum.Font.GothamBold
+visLabel.LayoutOrder = 10
+visLabel.Parent = otherPage
+
+local winsBox = Instance.new("TextBox")
+winsBox.Size = UDim2.new(1,0,0,28)
+winsBox.BackgroundColor3 = Color3.fromRGB(40,40,55)
+winsBox.BorderSizePixel = 0
+winsBox.PlaceholderText = "Wins eingeben..."
+winsBox.Text = ""
+winsBox.TextColor3 = Color3.new(1,1,1)
+winsBox.TextSize = 12
+winsBox.Font = Enum.Font.Gotham
+winsBox.LayoutOrder = 11
+winsBox.Parent = otherPage
+corner(winsBox, 6)
+
+local winsRow = Instance.new("Frame")
+winsRow.Size = UDim2.new(1,0,0,28)
+winsRow.BackgroundTransparency = 1
+winsRow.LayoutOrder = 12
+winsRow.Parent = otherPage
+
+local winsEnter = Instance.new("TextButton")
+winsEnter.Size = UDim2.new(0.48,0,1,0)
+winsEnter.BackgroundColor3 = Color3.fromRGB(80,60,180)
+winsEnter.Text = "Enter"
+winsEnter.TextColor3 = Color3.new(1,1,1)
+winsEnter.TextSize = 11
+winsEnter.Font = Enum.Font.GothamBold
+winsEnter.AutoButtonColor = false
+winsEnter.Parent = winsRow
+corner(winsEnter, 6)
+
+local winsReset = Instance.new("TextButton")
+winsReset.Size = UDim2.new(0.48,0,1,0)
+winsReset.Position = UDim2.new(0.52,0,0,0)
+winsReset.BackgroundColor3 = Color3.fromRGB(60,60,75)
+winsReset.Text = "Reset"
+winsReset.TextColor3 = Color3.new(1,1,1)
+winsReset.TextSize = 11
+winsReset.Font = Enum.Font.GothamBold
+winsReset.AutoButtonColor = false
+winsReset.Parent = winsRow
+corner(winsReset, 6)
+
+local saveWinsBtn = Instance.new("TextButton")
+saveWinsBtn.Size = UDim2.new(1,0,0,28)
+saveWinsBtn.BackgroundColor3 = CFG.COL_ACCENT
+saveWinsBtn.Text = "Save Wins for Reset"
+saveWinsBtn.TextColor3 = Color3.new(1,1,1)
+saveWinsBtn.TextSize = 11
+saveWinsBtn.Font = Enum.Font.GothamBold
+saveWinsBtn.AutoButtonColor = false
+saveWinsBtn.LayoutOrder = 13
+saveWinsBtn.Parent = otherPage
+corner(saveWinsBtn, 7)
+
+winsEnter.MouseButton1Click:Connect(function()
+	local n = tonumber(winsBox.Text)
+	if n and winsMantissa then winsMantissa.Value = n end
+end)
+winsReset.MouseButton1Click:Connect(function()
+	winsBox.Text = ""
+	if winsMantissa and State.savedWins ~= nil then winsMantissa.Value = State.savedWins end
+end)
+saveWinsBtn.MouseButton1Click:Connect(function()
+	if winsMantissa then
+		State.savedWins = winsMantissa.Value
+		saveWinsBtn.Text = "Saved!"
+		task.delay(1.2, function() saveWinsBtn.Text = "Save Wins for Reset" end)
+	end
+end)
+
+-- Settings colors
+local function addLabel(parent, text, order)
+	local l = Instance.new("TextLabel")
+	l.Size = UDim2.new(1,0,0,16)
+	l.BackgroundTransparency = 1
+	l.Text = text
+	l.TextColor3 = CFG.COL_MUTED
+	l.TextSize = 11
+	l.Font = Enum.Font.GothamBold
+	l.TextXAlignment = Enum.TextXAlignment.Left
+	l.LayoutOrder = order
+	l.Parent = parent
+end
+local function addColors(parent, order, cols, fn)
+	local row = Instance.new("Frame")
+	row.Size = UDim2.new(1,0,0,26)
+	row.BackgroundTransparency = 1
+	row.LayoutOrder = order
+	row.Parent = parent
+	local lay = Instance.new("UIListLayout")
+	lay.FillDirection = Enum.FillDirection.Horizontal
+	lay.Padding = UDim.new(0,3)
+	lay.Parent = row
+	for _,col in ipairs(cols) do
+		local b = Instance.new("TextButton")
+		b.Size = UDim2.new(0,24,0,24)
+		b.BackgroundColor3 = col
+		b.BorderSizePixel = 0
+		b.Text = ""
+		b.AutoButtonColor = false
+		b.Parent = row
+		corner(b, 5)
+		b.MouseButton1Click:Connect(function() fn(col) end)
+	end
+end
+addLabel(settingsPage, "Accent", 1)
+addColors(settingsPage, 2, {
+	Color3.fromRGB(220,50,60), Color3.fromRGB(230,120,40), Color3.fromRGB(40,180,90),
+	Color3.fromRGB(40,200,220), Color3.fromRGB(40,120,255), Color3.fromRGB(100,80,220),
+}, function(c)
+	CFG.COL_ACCENT = c
+	discordBtn.BackgroundColor3 = c
+	saveWinsBtn.BackgroundColor3 = c
+	if currentTab and tabs[currentTab] then tabs[currentTab].button.BackgroundColor3 = c end
+end)
+addLabel(settingsPage, "Buttons", 3)
+addColors(settingsPage, 4, {
+	Color3.fromRGB(22,22,28), Color3.fromRGB(35,35,48), Color3.fromRGB(55,55,70),
+	Color3.fromRGB(30,40,70), Color3.fromRGB(42,32,60),
+}, function(c)
+	CFG.COL_BTN = c
+	for n,t in pairs(tabs) do
+		if n ~= currentTab then t.button.BackgroundColor3 = c end
+	end
+end)
+addLabel(settingsPage, "Frame", 5)
+addColors(settingsPage, 6, {
+	Color3.fromRGB(10,10,12), Color3.fromRGB(18,18,24), Color3.fromRGB(28,28,36),
+	Color3.fromRGB(18,24,42), Color3.fromRGB(26,18,38),
+}, function(c)
+	CFG.COL_PANEL = c
+	main.BackgroundColor3 = c
+	titleBar.BackgroundColor3 = Color3.new(math.clamp(c.R*1.2,0,1), math.clamp(c.G*1.2,0,1), math.clamp(c.B*1.2,0,1))
+	titleFix.BackgroundColor3 = titleBar.BackgroundColor3
+end)
+
+-- Confirm
+local confirm = Instance.new("Frame")
+confirm.Size = UDim2.new(0,240,0,130)
+confirm.Position = UDim2.new(0.5,-120,0.5,-65)
+confirm.BackgroundColor3 = Color3.fromRGB(22,22,30)
+confirm.BorderSizePixel = 0
+confirm.Visible = false
+confirm.ZIndex = 20
+confirm.Parent = sg
+corner(confirm, 10)
+
+local cTitle = Instance.new("TextLabel")
+cTitle.Size = UDim2.new(1,-16,0,28)
+cTitle.Position = UDim2.new(0,8,0,10)
+cTitle.BackgroundTransparency = 1
+cTitle.Text = "Bestaetigen?"
+cTitle.TextColor3 = Color3.new(1,1,1)
+cTitle.TextSize = 16
+cTitle.Font = Enum.Font.GothamBold
+cTitle.ZIndex = 21
+cTitle.Parent = confirm
+
+local cText = Instance.new("TextLabel")
+cText.Size = UDim2.new(1,-16,0,36)
+cText.Position = UDim2.new(0,8,0,40)
+cText.BackgroundTransparency = 1
+cText.Text = "Bist du sicher?"
+cText.TextColor3 = CFG.COL_MUTED
+cText.TextSize = 13
+cText.Font = Enum.Font.Gotham
+cText.TextWrapped = true
+cText.ZIndex = 21
+cText.Parent = confirm
+
+local yesBtn = Instance.new("TextButton")
+yesBtn.Size = UDim2.new(0,90,0,30)
+yesBtn.Position = UDim2.new(0,20,1,-42)
+yesBtn.BackgroundColor3 = Color3.fromRGB(0,140,80)
+yesBtn.Text = "Ja"
+yesBtn.TextColor3 = Color3.new(1,1,1)
+yesBtn.TextSize = 14
+yesBtn.Font = Enum.Font.GothamBold
+yesBtn.AutoButtonColor = false
+yesBtn.ZIndex = 21
+yesBtn.Parent = confirm
+corner(yesBtn, 6)
+
+local noBtn = Instance.new("TextButton")
+noBtn.Size = UDim2.new(0,90,0,30)
+noBtn.Position = UDim2.new(1,-110,1,-42)
+noBtn.BackgroundColor3 = Color3.fromRGB(80,80,95)
+noBtn.Text = "Nein"
+noBtn.TextColor3 = Color3.new(1,1,1)
+noBtn.TextSize = 14
+noBtn.Font = Enum.Font.GothamBold
+noBtn.AutoButtonColor = false
+noBtn.ZIndex = 21
+noBtn.Parent = confirm
+corner(noBtn, 6)
+
+local function openConfirm(title, text, cb)
+	cTitle.Text = title; cText.Text = text; State.confirmCb = cb; confirm.Visible = true
+end
+yesBtn.MouseButton1Click:Connect(function()
+	local cb = State.confirmCb; confirm.Visible = false; State.confirmCb = nil
+	if cb then task.defer(cb) end
+end)
+noBtn.MouseButton1Click:Connect(function()
+	confirm.Visible = false; State.confirmCb = nil
+end)
+
+closeBtn.MouseButton1Click:Connect(function()
+	openConfirm("Panel schliessen?", "Moechtest du MonkeyGUI schliessen?", function()
+		State.speedOn = false; State.speedFarmOn = false; State.speedRunOn = false
+		clearSR(); timerOverlay.Visible = false; sg:Destroy()
 	end)
 end)
 
-resetColorsBtn.MouseButton1Click:Connect(function()
-	openConfirm("Farben resetten?", "Alle Farben auf Standard zurücksetzen?", resetAllColors)
+local origSize = UDim2.new(0,CFG.PANEL_W,0,CFG.PANEL_H)
+minBtn.MouseButton1Click:Connect(function()
+	State.minimized = not State.minimized
+	if State.minimized then
+		origSize = main.Size
+		main.Size = UDim2.new(0, main.Size.X.Offset, 0, CFG.TITLE_H)
+		body.Visible = false; minBtn.Text = "+"
+	else
+		main.Size = origSize; body.Visible = true; minBtn.Text = "-"
+	end
 end)
 
--- Cleanup beim Schließen (über doCloseGui erweitern)
-local oldDoClose = doCloseGui
-doCloseGui = function()
-	speedRunOn = false
-	timerRunning = false
-	clearSpeedRunConnections()
-	if timerOverlay then timerOverlay.Visible = false end
-	oldDoClose()
+-- Drag
+do
+	local dragging, start, pos = false, nil, nil
+	titleBar.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true; start = input.Position; pos = main.Position
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then dragging = false end
+			end)
+		end
+	end)
+	UIS.InputChanged:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			local d = input.Position - start
+			main.Position = UDim2.new(pos.X.Scale, pos.X.Offset+d.X, pos.Y.Scale, pos.Y.Offset+d.Y)
+		end
+	end)
 end
 
-print("[MonkeyGUI] v" .. VERSION .. " geladen")
+-- Resize
+local resize = Instance.new("TextButton")
+resize.Size = UDim2.new(0,14,0,14)
+resize.Position = UDim2.new(1,-16,1,-16)
+resize.BackgroundColor3 = Color3.fromRGB(70,70,95)
+resize.BorderSizePixel = 0
+resize.Text = ""
+resize.AutoButtonColor = false
+resize.Parent = main
+corner(resize, 3)
+do
+	local resizing, start, size = false, nil, nil
+	resize.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			resizing = true; start = input.Position; size = main.Size
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then resizing = false end
+			end)
+		end
+	end)
+	UIS.InputChanged:Connect(function(input)
+		if resizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			local d = input.Position - start
+			main.Size = UDim2.new(0, math.clamp(size.X.Offset+d.X, CFG.MIN_W, CFG.MAX_W), 0, math.clamp(size.Y.Offset+d.Y, CFG.MIN_H, CFG.MAX_H))
+		end
+	end)
+end
+
+-- Show
+task.spawn(function()
+	for i, step in ipairs({"Loading...","Loading UI...","Ready!"}) do
+		iStatus.Text = step
+		barFill.Size = UDim2.new(i/3,0,1,0)
+		task.wait(0.3)
+	end
+	task.wait(0.1)
+	intro:Destroy()
+	main.Visible = true
+	for n,t in pairs(tabs) do
+		local on = (n == "Farm VIP")
+		t.page.Visible = on
+		t.button.BackgroundColor3 = on and CFG.COL_ACCENT or CFG.COL_BTN
+		t.button.TextColor3 = on and Color3.new(1,1,1) or CFG.COL_MUTED
+	end
+	currentTab = "Farm VIP"
+	print("[MonkeyGUI] Panel sichtbar")
+end)
+
+task.delay(5, function()
+	if main and main.Parent and not main.Visible then
+		pcall(function() if intro and intro.Parent then intro:Destroy() end end)
+		main.Visible = true
+		print("[MonkeyGUI] Fallback Panel")
+	end
+end)
+
+print("[MonkeyGUI] v"..CFG.VERSION.." geladen")
